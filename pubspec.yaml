@@ -1,0 +1,68 @@
+name: lingua_go
+description: Aplikasi belajar bahasa asing - LinguaGo
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.2
+
+  # Database lokal
+  sqflite: ^2.3.3
+  path: ^1.9.0
+
+  # Preferences & Session
+  shared_preferences: ^2.2.3
+
+  # Enkripsi password
+  crypto: ^3.0.3
+
+  # Biometric
+  local_auth: ^2.2.0
+
+  # Location & Maps
+  geolocator: ^11.0.0
+  google_maps_flutter: ^2.6.1
+
+  # HTTP
+  http: ^1.2.1
+
+  # Sensor
+  sensors_plus: ^5.0.1
+
+  # Notifikasi
+  flutter_local_notifications: ^17.1.2
+  timezone: ^0.9.2
+
+  # Internasionalisasi
+  intl: ^0.19.0
+
+  # .env
+  flutter_dotenv: ^5.1.0
+
+  # Gambar Profil
+  image_picker: ^1.1.1
+
+  # Permission
+  permission_handler: ^11.3.1
+
+  # Icon
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+    - .env
