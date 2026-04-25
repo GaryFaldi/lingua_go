@@ -115,16 +115,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ── Logout ────────────────────────────────────────────────
-  //   Future<void> logout() async {
-  //   // Jangan hapus user_id! Biarkan tersimpan untuk biometrik
-  //   _currentUser = null;
-  //   notifyListeners();
-  // }
-
-  // Kalau mau benar-benar hapus sesi (misal ganti akun)
-  Future<void> logoutAndClearSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_id');
+  Future<void> logout() async {
+    await _clearSession();
     _currentUser = null;
     notifyListeners();
   }
