@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/hash_helper.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
 
@@ -12,30 +13,32 @@ class AuthProvider extends ChangeNotifier {
   UserModel? _currentUser;
   bool _isLoading = false;
   String? _errorMessage;
+  String? _lockedUsername;
 
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _currentUser != null;
+  String? get lockedUsername => _lockedUsername;
 
   // ── Session ──────────────────────────────────────────────
   Future<void> tryRestoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('user_id');
+
     if (userId != null) {
-      _currentUser = await _repo.getUserById(userId);
+      // Jangan restore _currentUser langsung!
+      // Cukup set _lockedUsername supaya masuk LockScreen dulu
+      _lockedUsername = prefs.getString('locked_username') ?? 'Pengguna';
       notifyListeners();
     }
+    // Kalau tidak ada userId sama sekali → LoginPage (lockedUsername tetap null)
   }
 
-  Future<void> _saveSession(int userId) async {
+  Future<void> _saveSession(int userId, String username) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('user_id', userId);
-  }
-
-  Future<void> _clearSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_id');
+    await prefs.setString('locked_username', username);
   }
 
   // ── Register ─────────────────────────────────────────────
@@ -47,9 +50,7 @@ class AuthProvider extends ChangeNotifier {
     final result = await _repo.register(username: username, password: password);
 
     _isLoading = false;
-    if (!result.success) {
-      _errorMessage = result.message;
-    }
+    if (!result.success) _errorMessage = result.message;
     notifyListeners();
     return result.success;
   }
@@ -65,12 +66,56 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = false;
     if (result.success && result.user != null) {
       _currentUser = result.user;
-      await _saveSession(result.user!.id!);
+      _lockedUsername = null;
+      await _saveSession(result.user!.id!, result.user!.username);
     } else {
       _errorMessage = result.message;
     }
     notifyListeners();
     return result.success;
+  }
+
+  // ── Unlock dengan Password (LockScreen) ───────────────────
+  Future<bool> unlockWithPassword(String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('user_id');
+
+    if (userId == null) {
+      _errorMessage = 'Sesi tidak ditemukan';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    final user = await _repo.getUserById(userId);
+    if (user == null) {
+      _errorMessage = 'User tidak ditemukan';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    final isValid = HashHelper.verifyPassword(
+      password,
+      user.salt,
+      user.passwordHash,
+    );
+    if (!isValid) {
+      _errorMessage = 'Password salah!';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    _currentUser = user;
+    _lockedUsername = null;
+    _isLoading = false;
+    notifyListeners();
+    return true;
   }
 
   // ── Biometric Login ───────────────────────────────────────
@@ -92,11 +137,11 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (didAuth) {
-        // Restore session dari SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         final userId = prefs.getInt('user_id');
         if (userId != null) {
           _currentUser = await _repo.getUserById(userId);
+          _lockedUsername = null;
           notifyListeners();
           return true;
         } else {
@@ -114,10 +159,20 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ── Logout ────────────────────────────────────────────────
+  // ── Logout → LockScreen ───────────────────────────────────
   Future<void> logout() async {
-    await _clearSession();
+    _lockedUsername = _currentUser?.username;
     _currentUser = null;
+    notifyListeners();
+  }
+
+  // ── Logout Permanen → LoginPage ───────────────────────────
+  Future<void> logoutAndClearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_id');
+    await prefs.remove('locked_username');
+    _currentUser = null;
+    _lockedUsername = null;
     notifyListeners();
   }
 }
