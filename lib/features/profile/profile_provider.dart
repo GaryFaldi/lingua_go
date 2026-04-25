@@ -17,10 +17,14 @@ class ProfileProvider extends ChangeNotifier {
   String? get photoPath => _photoPath;
   bool get isLoading => _isLoading;
 
-  Future<void> loadPrefs() async {
+  String _biometricKey(int userId) => 'biometric_enabled_$userId';
+  String _photoKey(int userId) => 'photo_path_$userId';
+
+  Future<void> loadPrefs(int userId) async {
+    // ✅ Terima userId
     final prefs = await SharedPreferences.getInstance();
-    _biometricEnabled = prefs.getBool('biometric_enabled') ?? false;
-    _photoPath = prefs.getString('photo_path');
+    _biometricEnabled = prefs.getBool(_biometricKey(userId)) ?? false;
+    _photoPath = prefs.getString(_photoKey(userId));
     notifyListeners();
   }
 
@@ -29,10 +33,9 @@ class ProfileProvider extends ChangeNotifier {
     final picked = await picker.pickImage(source: source, imageQuality: 80);
     if (picked == null) return null;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('photo_path', picked.path);
-
     if (userId != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_photoKey(userId), picked.path); // ✅ Key per-user
       await _repo.updatePhotoPath(userId, picked.path);
     }
 
@@ -41,7 +44,8 @@ class ProfileProvider extends ChangeNotifier {
     return picked.path;
   }
 
-  Future<bool> toggleBiometric(bool value) async {
+  Future<bool> toggleBiometric(bool value, int userId) async {
+    // ✅ Terima userId
     if (value) {
       final canCheck = await _localAuth.canCheckBiometrics;
       if (!canCheck) return false;
@@ -54,7 +58,7 @@ class ProfileProvider extends ChangeNotifier {
     }
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('biometric_enabled', value);
+    await prefs.setBool(_biometricKey(userId), value); // ✅ Key per-user
     _biometricEnabled = value;
     notifyListeners();
     return true;

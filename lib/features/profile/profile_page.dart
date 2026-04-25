@@ -20,7 +20,8 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _profileProvider = ProfileProvider();
-    _profileProvider.loadPrefs();
+    final userId = context.read<AuthProvider>().currentUser?.id;
+    if (userId != null) _profileProvider.loadPrefs(userId);
   }
 
   @override
@@ -86,7 +87,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // ── Toggle Biometrik ──────────────────────────────────────
   Future<void> _toggleBiometric(bool value) async {
-    final ok = await _profileProvider.toggleBiometric(value);
+    final userId = context.read<AuthProvider>().currentUser?.id;
+    if (userId == null) return;
+    final ok = await _profileProvider.toggleBiometric(value, userId);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Perangkat tidak mendukung biometrik')),
@@ -293,7 +296,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             onPressed: () {
               Navigator.pop(context);
-              context.read<AuthProvider>().logout();
+              context.read<AuthProvider>().logoutAndClearSession();
             },
             child: const Text('Logout'),
           ),

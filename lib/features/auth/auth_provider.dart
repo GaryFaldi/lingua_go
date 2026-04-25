@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 import '../../core/utils/hash_helper.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
@@ -121,7 +122,20 @@ class AuthProvider extends ChangeNotifier {
   // ── Biometric Login ───────────────────────────────────────
   Future<bool> loginWithBiometric() async {
     try {
+      _errorMessage = null;
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id');
+      final biometricEnabled = userId != null
+          ? (prefs.getBool('biometric_enabled_$userId') ?? false)
+          : false;
+      print('biometricEnabled: $biometricEnabled');
+      if (!biometricEnabled) {
+        _errorMessage = 'Login sidik jari belum diaktifkan';
+        return false;
+      }
+
       final bool canAuth = await _localAuth.canCheckBiometrics;
+      print('biometricEnabled: $biometricEnabled');
       if (!canAuth) {
         _errorMessage = 'Perangkat tidak mendukung biometrik';
         notifyListeners();
@@ -136,24 +150,28 @@ class AuthProvider extends ChangeNotifier {
         ),
       );
 
-      if (didAuth) {
-        final prefs = await SharedPreferences.getInstance();
-        final userId = prefs.getInt('user_id');
-        if (userId != null) {
-          _currentUser = await _repo.getUserById(userId);
-          _lockedUsername = null;
-          notifyListeners();
-          return true;
-        } else {
-          _errorMessage =
-              'Belum ada sesi tersimpan. Login dengan password dulu.';
-          notifyListeners();
-          return false;
-        }
+      if (!didAuth) {
+        // User cancel/tekan silang → tidak perlu pesan error
+        return false;
       }
+
+      _currentUser = await _repo.getUserById(userId);
+      _lockedUsername = null;
+      notifyListeners();
+      return true;
+    } on PlatformException catch (e) {
+      // Error teknis yang memang perlu diinformasikan
+      if (e.code == 'NotEnrolled') {
+        _errorMessage = 'Belum ada sidik jari terdaftar di perangkat ini';
+      } else if (e.code == 'LockedOut' || e.code == 'PermanentlyLockedOut') {
+        _errorMessage = 'Biometrik terkunci, coba lagi nanti';
+      } else {
+        _errorMessage = 'Biometrik tidak tersedia: ${e.message}';
+      }
+      notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Biometrik gagal: $e';
+      _errorMessage = 'Terjadi kesalahan tidak terduga';
       notifyListeners();
       return false;
     }

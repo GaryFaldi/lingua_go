@@ -28,8 +28,16 @@ class _LockScreenState extends State<LockScreen> {
     final auth = context.read<AuthProvider>();
     final success = await auth.unlockWithPassword(_passwordCtrl.text);
 
-    if (!success && mounted) {
-      setState(() => _isLoading = false);
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Selamat datang, ${auth.currentUser?.username}! 👋'),
+          backgroundColor: Colors.green.shade600,
+        ),
+      );
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(auth.errorMessage ?? 'Password salah!'),
@@ -43,13 +51,19 @@ class _LockScreenState extends State<LockScreen> {
   Future<void> _handleBiometric() async {
     final auth = context.read<AuthProvider>();
     final success = await auth.loginWithBiometric();
+    final errorMsg = auth.errorMessage;
 
-    if (!success && mounted) {
+    if (!mounted) return;
+    if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(auth.errorMessage ?? 'Biometrik gagal'),
-          backgroundColor: Colors.red.shade700,
+          content: Text('Selamat datang, ${auth.currentUser?.username}! 👋'),
+          backgroundColor: Colors.green.shade600,
         ),
+      );
+    } else if (errorMsg != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMsg), backgroundColor: Colors.red.shade700),
       );
     }
   }

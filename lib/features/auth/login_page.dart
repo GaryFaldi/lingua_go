@@ -29,23 +29,18 @@ class _LoginPageState extends State<LoginPage> {
       _usernameCtrl.text.trim(),
       _passwordCtrl.text,
     );
-    if (!success && mounted) {
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Selamat datang, ${auth.currentUser?.username}! 👋'),
+          backgroundColor: Colors.green.shade600,
+        ),
+      );
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(auth.errorMessage ?? 'Login gagal'),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-    }
-  }
-
-  Future<void> _handleBiometric() async {
-    final auth = context.read<AuthProvider>();
-    final success = await auth.loginWithBiometric();
-    if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(auth.errorMessage ?? 'Biometrik gagal'),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -214,22 +209,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // ── Biometric Button ───────────────────────
-                OutlinedButton.icon(
-                  onPressed: _handleBiometric,
-                  icon: const Icon(Icons.fingerprint_rounded, size: 22),
-                  label: const Text('Masuk dengan Sidik Jari'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 52),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    side: const BorderSide(color: Color(0xFF6C63FF)),
-                    foregroundColor: const Color(0xFF6C63FF),
-                  ),
-                ),
-                const SizedBox(height: 20),
 
                 // ── Link ke Register ───────────────────────
                 Row(
