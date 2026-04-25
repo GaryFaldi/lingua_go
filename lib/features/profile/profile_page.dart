@@ -2,12 +2,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../data/local/database_helper.dart';
-// import '../../data/models/suggestion_model.dart';
 import '../auth/auth_provider.dart';
+import 'profile_provider.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -17,46 +14,25 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final LocalAuthentication _localAuth = LocalAuthentication();
-  bool _biometricEnabled = false;
-  String? _photoPath;
+  late final ProfileProvider _profileProvider;
 
   @override
   void initState() {
     super.initState();
-    _loadPrefs();
+    _profileProvider = ProfileProvider();
+    _profileProvider.loadPrefs();
   }
 
-  Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _biometricEnabled = prefs.getBool('biometric_enabled') ?? false;
-      _photoPath = prefs.getString('photo_path');
-    });
+  @override
+  void dispose() {
+    _profileProvider.dispose();
+    super.dispose();
   }
 
   // ── Foto Profil ───────────────────────────────────────────
   Future<void> _pickPhoto(ImageSource source) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source, imageQuality: 80);
-    if (picked == null) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('photo_path', picked.path);
-
-    // Simpan path ke DB juga
     final auth = context.read<AuthProvider>();
-    if (auth.currentUser?.id != null) {
-      final db = await DatabaseHelper.instance.database;
-      await db.update(
-        'users',
-        {'photo_path': picked.path},
-        where: 'id = ?',
-        whereArgs: [auth.currentUser!.id],
-      );
-    }
-
-    setState(() => _photoPath = picked.path);
+    await _profileProvider.pickPhoto(source, auth.currentUser?.id);
   }
 
   void _showPhotoOptions() {
@@ -110,30 +86,12 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // ── Toggle Biometrik ──────────────────────────────────────
   Future<void> _toggleBiometric(bool value) async {
-    if (value) {
-      final canCheck = await _localAuth.canCheckBiometrics;
-      if (!canCheck) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Perangkat tidak mendukung biometrik'),
-            ),
-          );
-        }
-        return;
-      }
-
-      final didAuth = await _localAuth.authenticate(
-        localizedReason: 'Konfirmasi untuk mengaktifkan login sidik jari',
-        options: const AuthenticationOptions(biometricOnly: true),
+    final ok = await _profileProvider.toggleBiometric(value);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Perangkat tidak mendukung biometrik')),
       );
-
-      if (!didAuth) return;
     }
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('biometric_enabled', value);
-    setState(() => _biometricEnabled = value);
   }
 
   // ── Ganti Password ────────────────────────────────────────
@@ -141,6 +99,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final oldCtrl = TextEditingController();
     final newCtrl = TextEditingController();
     final confirmCtrl = TextEditingController();
+    final auth = context.read<AuthProvider>();
 
     showDialog(
       context: context,
@@ -182,18 +141,19 @@ class _ProfilePageState extends State<ProfilePage> {
               foregroundColor: Colors.white,
             ),
             onPressed: () async {
-              if (newCtrl.text != confirmCtrl.text) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password baru tidak cocok!')),
-                );
-                return;
-              }
-              // TODO: panggil auth_repository untuk update password
+              final result = await _profileProvider.changePassword(
+                userId: auth.currentUser!.id!,
+                username: auth.currentUser!.username,
+                oldPassword: oldCtrl.text,
+                newPassword: newCtrl.text,
+                confirmPassword: confirmCtrl.text,
+              );
+              if (!mounted) return;
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Password berhasil diubah!'),
-                  backgroundColor: Colors.green,
+                SnackBar(
+                  content: Text(result.message),
+                  backgroundColor: result.success ? Colors.green : Colors.red,
                 ),
               );
             },
@@ -288,16 +248,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 onPressed: () async {
-                  if (kesanCtrl.text.isEmpty && saranCtrl.text.isEmpty) {
-                    return;
-                  }
-                  final db = await DatabaseHelper.instance.database;
-                  await db.insert('suggestions', {
-                    'user_id': auth.currentUser?.id ?? 0,
-                    'kesan': kesanCtrl.text,
-                    'saran': saranCtrl.text,
-                    'created_at': DateTime.now().toIso8601String(),
-                  });
+                  if (kesanCtrl.text.isEmpty && saranCtrl.text.isEmpty) return;
+                  await _profileProvider.saveSuggestion(
+                    userId: auth.currentUser?.id ?? 0,
+                    kesan: kesanCtrl.text,
+                    saran: saranCtrl.text,
+                  );
                   if (mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -353,296 +309,297 @@ class _ProfilePageState extends State<ProfilePage> {
     final user = auth.currentUser;
     final xpProgress = (user?.xp ?? 0) % 1000;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5FF),
-      body: CustomScrollView(
-        slivers: [
-          // Header ungu
-          SliverToBoxAdapter(
-            child: Container(
-              color: const Color(0xFF6C63FF),
-              padding: const EdgeInsets.fromLTRB(20, 56, 20, 24),
-              child: Column(
-                children: [
-                  Row(
+    return ChangeNotifierProvider.value(
+      value: _profileProvider,
+      child: Consumer<ProfileProvider>(
+        builder: (context, profile, _) => Scaffold(
+          backgroundColor: const Color(0xFFF5F5FF),
+          body: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Container(
+                  color: const Color(0xFF6C63FF),
+                  padding: const EdgeInsets.fromLTRB(20, 56, 20, 24),
+                  child: Column(
                     children: [
-                      // Avatar
-                      GestureDetector(
-                        onTap: _showPhotoOptions,
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 36,
-                              backgroundColor: Colors.white24,
-                              backgroundImage: _photoPath != null
-                                  ? FileImage(File(_photoPath!))
-                                  : null,
-                              child: _photoPath == null
-                                  ? Text(
-                                      (user?.username ?? 'U')[0].toUpperCase(),
-                                      style: const TextStyle(
-                                        fontSize: 28,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                width: 22,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  color: Colors.amber,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: const Color(0xFF6C63FF),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.camera_alt,
-                                  size: 12,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user?.username ?? 'User',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Level ${user?.currentLevel ?? 1} — Language Adventurer',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // XP Bar
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'XP Progress',
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
-                      ),
-                      Text(
-                        '$xpProgress / 1000',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: LinearProgressIndicator(
-                      value: xpProgress / 1000,
-                      minHeight: 8,
-                      backgroundColor: Colors.white24,
-                      valueColor: const AlwaysStoppedAnimation(Colors.amber),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // ── Akun ──────────────────────────────────
-                _SectionLabel('Akun'),
-                _ProfileCard(
-                  children: [
-                    _ProfileRow(
-                      icon: Icons.photo_camera_rounded,
-                      iconBg: const Color(0xFF6C63FF),
-                      title: 'Foto Profil',
-                      subtitle: 'Kamera / Galeri',
-                      onTap: _showPhotoOptions,
-                    ),
-                    _ProfileRow(
-                      icon: Icons.lock_reset_rounded,
-                      iconBg: const Color(0xFF1D9E75),
-                      title: 'Ganti Password',
-                      subtitle: 'Perbarui keamanan akun',
-                      onTap: _showChangePasswordDialog,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // ── Keamanan ───────────────────────────────
-                _SectionLabel('Keamanan'),
-                _ProfileCard(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      child: Row(
+                      Row(
                         children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF378ADD).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.fingerprint_rounded,
-                              color: Color(0xFF378ADD),
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          GestureDetector(
+                            onTap: _showPhotoOptions,
+                            child: Stack(
                               children: [
-                                Text(
-                                  'Login Sidik Jari',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                CircleAvatar(
+                                  radius: 36,
+                                  backgroundColor: Colors.white24,
+                                  backgroundImage: profile.photoPath != null
+                                      ? FileImage(File(profile.photoPath!))
+                                      : null,
+                                  child: profile.photoPath == null
+                                      ? Text(
+                                          (user?.username ?? 'U')[0]
+                                              .toUpperCase(),
+                                          style: const TextStyle(
+                                            fontSize: 28,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
                                 ),
-                                Text(
-                                  'Login tanpa password',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(0xFF6C63FF),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.camera_alt,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          Switch(
-                            value: _biometricEnabled,
-                            onChanged: _toggleBiometric,
-                            activeColor: const Color(0xFF6C63FF),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  user?.username ?? 'User',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Level ${user?.currentLevel ?? 1} — Language Adventurer',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // ── Progress ───────────────────────────────
-                _SectionLabel('Progress Belajar'),
-                _ProfileCard(
-                  children: [
-                    _ProfileRow(
-                      icon: Icons.emoji_events_rounded,
-                      iconBg: Colors.amber.shade600,
-                      title: 'Level Saat Ini',
-                      subtitle: 'Main Quest progress',
-                      trailing: _Chip('Lv. ${user?.currentLevel ?? 1}'),
-                    ),
-                    _ProfileRow(
-                      icon: Icons.menu_book_rounded,
-                      iconBg: const Color(0xFF1D9E75),
-                      title: 'Word Bank',
-                      subtitle: 'Koleksi kata kamu',
-                      trailing: const _Chip('Lihat'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // ── TPM ────────────────────────────────────
-                _SectionLabel('Mata Kuliah TPM'),
-                _ProfileCard(
-                  children: [
-                    _ProfileRow(
-                      icon: Icons.rate_review_rounded,
-                      iconBg: const Color(0xFFD4537E),
-                      title: 'Kesan & Saran',
-                      subtitle: 'Feedback matakuliah TPM',
-                      onTap: _showSuggestionSheet,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // ── Logout ─────────────────────────────────
-                OutlinedButton.icon(
-                  onPressed: _confirmLogout,
-                  icon: const Icon(
-                    Icons.logout_rounded,
-                    color: Colors.red,
-                    size: 20,
-                  ),
-                  label: const Text(
-                    'Logout',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    side: BorderSide(color: Colors.red.shade300),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'XP Progress',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          Text(
+                            '$xpProgress / 1000',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: xpProgress / 1000,
+                          minHeight: 8,
+                          backgroundColor: Colors.white24,
+                          valueColor: const AlwaysStoppedAnimation(
+                            Colors.amber,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 24),
-              ]),
-            ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _SectionLabel('Akun'),
+                    _ProfileCard(
+                      children: [
+                        _ProfileRow(
+                          icon: Icons.photo_camera_rounded,
+                          iconBg: const Color(0xFF6C63FF),
+                          title: 'Foto Profil',
+                          subtitle: 'Kamera / Galeri',
+                          onTap: _showPhotoOptions,
+                        ),
+                        _ProfileRow(
+                          icon: Icons.lock_reset_rounded,
+                          iconBg: const Color(0xFF1D9E75),
+                          title: 'Ganti Password',
+                          subtitle: 'Perbarui keamanan akun',
+                          onTap: _showChangePasswordDialog,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _SectionLabel('Keamanan'),
+                    _ProfileCard(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF378ADD,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.fingerprint_rounded,
+                                  color: Color(0xFF378ADD),
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Login Sidik Jari',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Login tanpa password',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: profile.biometricEnabled,
+                                onChanged: _toggleBiometric,
+                                activeColor: const Color(0xFF6C63FF),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _SectionLabel('Progress Belajar'),
+                    _ProfileCard(
+                      children: [
+                        _ProfileRow(
+                          icon: Icons.emoji_events_rounded,
+                          iconBg: Colors.amber.shade600,
+                          title: 'Level Saat Ini',
+                          subtitle: 'Main Quest progress',
+                          trailing: _Chip('Lv. ${user?.currentLevel ?? 1}'),
+                        ),
+                        _ProfileRow(
+                          icon: Icons.menu_book_rounded,
+                          iconBg: const Color(0xFF1D9E75),
+                          title: 'Word Bank',
+                          subtitle: 'Koleksi kata kamu',
+                          trailing: const _Chip('Lihat'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _SectionLabel('Mata Kuliah TPM'),
+                    _ProfileCard(
+                      children: [
+                        _ProfileRow(
+                          icon: Icons.rate_review_rounded,
+                          iconBg: const Color(0xFFD4537E),
+                          title: 'Kesan & Saran',
+                          subtitle: 'Feedback matakuliah TPM',
+                          onTap: _showSuggestionSheet,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    OutlinedButton.icon(
+                      onPressed: _confirmLogout,
+                      icon: const Icon(
+                        Icons.logout_rounded,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                      label: const Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        side: BorderSide(color: Colors.red.shade300),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ]),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-// ── Helper Widgets ──────────────────────────────────────────
+// ── Helper Widgets ──────────────────────────
 class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.8,
-        color: Colors.grey.shade500,
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey.shade700,
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _ProfileCard extends StatelessWidget {
@@ -650,34 +607,13 @@ class _ProfileCard extends StatelessWidget {
   const _ProfileCard({required this.children});
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.04),
-          blurRadius: 10,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Column(
-      children: children
-          .asMap()
-          .entries
-          .map(
-            (e) => Column(
-              children: [
-                e.value,
-                if (e.key < children.length - 1)
-                  Divider(height: 1, color: Colors.grey.shade100),
-              ],
-            ),
-          )
-          .toList(),
-    ),
-  );
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(children: children),
+    );
+  }
 }
 
 class _ProfileRow extends StatelessWidget {
@@ -698,71 +634,47 @@ class _ProfileRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(14),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: iconBg.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: iconBg, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                ),
-              ],
-            ),
-          ),
-          trailing ??
-              Icon(
-                Icons.chevron_right_rounded,
-                color: Colors.grey.shade400,
-                size: 20,
-              ),
-        ],
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: iconBg.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: iconBg, size: 20),
       ),
-    ),
-  );
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(fontSize: 12, color: Colors.grey),
+      ),
+      trailing: trailing,
+      onTap: onTap,
+    );
+  }
 }
 
 class _Chip extends StatelessWidget {
-  final String label;
-  const _Chip(this.label);
+  final String text;
+  const _Chip(this.text);
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: const Color(0xFF6C63FF).withOpacity(0.1),
-      borderRadius: BorderRadius.circular(99),
-    ),
-    child: Text(
-      label,
-      style: const TextStyle(
-        fontSize: 12,
-        color: Color(0xFF6C63FF),
-        fontWeight: FontWeight.w500,
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
       ),
-    ),
-  );
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+      ),
+    );
+  }
 }
