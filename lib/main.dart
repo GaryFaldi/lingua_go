@@ -6,13 +6,13 @@ import 'features/auth/auth_provider.dart';
 import 'features/auth/login_page.dart';
 import 'features/auth/lock_screen.dart';
 import 'features/home/main_navigation.dart';
+import 'features/home/main_quest/quest_provider.dart';
 
 // lib/main.dart
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
 
-  // Restore session SEBELUM runApp
   final authProvider = AuthProvider();
   await authProvider.tryRestoreSession();
 
@@ -27,7 +27,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider.value(value: authProvider), // pakai .value
+        ChangeNotifierProvider.value(value: authProvider),
+        ChangeNotifierProvider(create: (_) => QuestProvider()),
       ],
       child: MaterialApp(
         title: 'LinguaQuest',
