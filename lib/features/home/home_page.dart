@@ -5,8 +5,8 @@ import '../auth/auth_provider.dart';
 import 'main_quest/quest_provider.dart';
 import 'main_quest/quest_list_page.dart';
 import 'main_quest/quest_detail_page.dart';
-// import 'side_quest/tilt_a_word_page.dart';
-// import 'side_quest/shake_challenge_page.dart';
+import 'side_quest/tilt_a_word_page.dart';
+import 'side_quest/shake_challenge_page.dart';
 import 'side_quest/word_bank_page.dart';
 import 'dictionary/dictionary_page.dart';
 
@@ -47,14 +47,14 @@ class HomePage extends StatelessWidget {
               _buildMainQuestCard(context, quest),
               const SizedBox(height: 24),
 
-              // // ── Side Quest ──────────────────────────────
-              // _buildSectionTitle('🎮 Side Quest', null),
-              // const SizedBox(height: 12),
-              // _buildSideQuestGrid(context),
-              // const SizedBox(height: 24),
+              // ── Side Quest ──────────────────────────────
+              _buildSectionTitle('🎮 Side Quest', null),
+              const SizedBox(height: 12),
+              _buildSideQuestGrid(context),
+              const SizedBox(height: 24),
 
-              // // ── Daily Challenge ─────────────────────────
-              // _buildDailyChallenge(context),
+              // ── Daily Challenge ─────────────────────────
+              _buildDailyChallenge(context),
             ],
           ),
         ),
@@ -476,186 +476,186 @@ class HomePage extends StatelessWidget {
 
   // ── Side Quest Grid ─────────────────────────────────────
 
-  // Widget _buildSideQuestGrid(BuildContext context) {
-  //   final items = [
-  //     _SideQuestItem(
-  //       icon: '📱',
-  //       title: 'Tilt-A-Word',
-  //       subtitle: 'Gyroscope Game',
-  //       gradient: const [Color(0xFFEC4899), Color(0xFFF97316)],
-  //       onTap: () => Navigator.push(
-  //         context,
-  //         MaterialPageRoute(builder: (_) => const TiltAWordPage()),
-  //       ),
-  //     ),
-  //     _SideQuestItem(
-  //       icon: '🎲',
-  //       title: 'Shake!',
-  //       subtitle: 'Kuis Kilat Harian',
-  //       gradient: const [Color(0xFF10B981), Color(0xFF06B6D4)],
-  //       onTap: () => Navigator.push(
-  //         context,
-  //         MaterialPageRoute(builder: (_) => const ShakeChallengePage()),
-  //       ),
-  //     ),
-  //     _SideQuestItem(
-  //       icon: '📖',
-  //       title: 'Kamus',
-  //       subtitle: 'Cari Kata',
-  //       gradient: const [Color(0xFF3B82F6), Color(0xFF6366F1)],
-  //       onTap: () => Navigator.push(
-  //         context,
-  //         MaterialPageRoute(builder: (_) => const DictionaryPage()),
-  //       ),
-  //     ),
-  //     _SideQuestItem(
-  //       icon: '⭐',
-  //       title: 'Word Bank',
-  //       subtitle: 'Koleksi Vocab',
-  //       gradient: const [Color(0xFFF59E0B), Color(0xFFEF4444)],
-  //       onTap: () => Navigator.push(
-  //         context,
-  //         MaterialPageRoute(builder: (_) => const WordBankPage()),
-  //       ),
-  //     ),
-  //   ];
+  Widget _buildSideQuestGrid(BuildContext context) {
+    final items = [
+      _SideQuestItem(
+        icon: '📱',
+        title: 'Tilt-A-Word',
+        subtitle: 'Gyroscope Game',
+        gradient: const [Color(0xFFEC4899), Color(0xFFF97316)],
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TiltAWordPage()),
+        ),
+      ),
+      _SideQuestItem(
+        icon: '🎲',
+        title: 'Shake!',
+        subtitle: 'Kuis Kilat Harian',
+        gradient: const [Color(0xFF10B981), Color(0xFF06B6D4)],
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ShakeChallengePage()),
+        ),
+      ),
+      _SideQuestItem(
+        icon: '📖',
+        title: 'Kamus',
+        subtitle: 'Cari Kata',
+        gradient: const [Color(0xFF3B82F6), Color(0xFF6366F1)],
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const DictionaryPage()),
+        ),
+      ),
+      _SideQuestItem(
+        icon: '⭐',
+        title: 'Word Bank',
+        subtitle: 'Koleksi Vocab',
+        gradient: const [Color(0xFFF59E0B), Color(0xFFEF4444)],
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const WordBankPage()),
+        ),
+      ),
+    ];
 
-  //   return GridView.count(
-  //     crossAxisCount: 2,
-  //     shrinkWrap: true,
-  //     physics: const NeverScrollableScrollPhysics(),
-  //     crossAxisSpacing: 12,
-  //     mainAxisSpacing: 12,
-  //     childAspectRatio: 1.6,
-  //     children: items.map((item) => _buildSideQuestCard(item)).toList(),
-  //   );
-  // }
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.6,
+      children: items.map((item) => _buildSideQuestCard(item)).toList(),
+    );
+  }
 
-  // Widget _buildSideQuestCard(_SideQuestItem item) {
-  //   return GestureDetector(
-  //     onTap: item.onTap,
-  //     child: Container(
-  //       decoration: BoxDecoration(
-  //         gradient: LinearGradient(
-  //           colors: item.gradient,
-  //           begin: Alignment.topLeft,
-  //           end: Alignment.bottomRight,
-  //         ),
-  //         borderRadius: BorderRadius.circular(16),
-  //         boxShadow: [
-  //           BoxShadow(
-  //             color: item.gradient[0].withOpacity(0.3),
-  //             blurRadius: 10,
-  //             offset: const Offset(0, 4),
-  //           ),
-  //         ],
-  //       ),
-  //       padding: const EdgeInsets.all(14),
-  //       child: Column(
-  //         crossAxisAlignment: CrossAxisAlignment.start,
-  //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //         children: [
-  //           Text(item.icon, style: const TextStyle(fontSize: 28)),
-  //           Column(
-  //             crossAxisAlignment: CrossAxisAlignment.start,
-  //             children: [
-  //               Text(
-  //                 item.title,
-  //                 style: const TextStyle(
-  //                   color: Colors.white,
-  //                   fontWeight: FontWeight.bold,
-  //                   fontSize: 14,
-  //                 ),
-  //               ),
-  //               Text(
-  //                 item.subtitle,
-  //                 style: const TextStyle(color: Colors.white70, fontSize: 11),
-  //               ),
-  //             ],
-  //           ),
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
+  Widget _buildSideQuestCard(_SideQuestItem item) {
+    return GestureDetector(
+      onTap: item.onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: item.gradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: item.gradient[0].withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(item.icon, style: const TextStyle(fontSize: 28)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  item.subtitle,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // ── Daily Challenge ─────────────────────────────────────
 
-  // Widget _buildDailyChallenge(BuildContext context) {
-  //   return Container(
-  //     width: double.infinity,
-  //     padding: const EdgeInsets.all(18),
-  //     decoration: BoxDecoration(
-  //       color: Colors.white,
-  //       borderRadius: BorderRadius.circular(18),
-  //       boxShadow: [
-  //         BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12),
-  //       ],
-  //     ),
-  //     child: Row(
-  //       children: [
-  //         Container(
-  //           padding: const EdgeInsets.all(12),
-  //           decoration: BoxDecoration(
-  //             color: Colors.amber.shade50,
-  //             borderRadius: BorderRadius.circular(14),
-  //           ),
-  //           child: const Text('🔥', style: TextStyle(fontSize: 28)),
-  //         ),
-  //         const SizedBox(width: 14),
-  //         Expanded(
-  //           child: Column(
-  //             crossAxisAlignment: CrossAxisAlignment.start,
-  //             children: [
-  //               const Text(
-  //                 'Tantangan Harian',
-  //                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-  //               ),
-  //               const Text(
-  //                 'Guncang HP untuk kuis kilat +50 XP!',
-  //                 style: TextStyle(color: Colors.grey, fontSize: 12),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //         GestureDetector(
-  //           onTap: () => Navigator.push(
-  //             context,
-  //             MaterialPageRoute(builder: (_) => const ShakeChallengePage()),
-  //           ),
-  //           child: Container(
-  //             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-  //             decoration: BoxDecoration(
-  //               color: Colors.amber,
-  //               borderRadius: BorderRadius.circular(20),
-  //             ),
-  //             child: const Text(
-  //               'Main!',
-  //               style: TextStyle(
-  //                 color: Colors.white,
-  //                 fontWeight: FontWeight.bold,
-  //                 fontSize: 13,
-  //               ),
-  //             ),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
+  Widget _buildDailyChallenge(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Text('🔥', style: TextStyle(fontSize: 28)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Tantangan Harian',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                const Text(
+                  'Guncang HP untuk kuis kilat +50 XP!',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ShakeChallengePage()),
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'Main!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// class _SideQuestItem {
-//   final String icon;
-//   final String title;
-//   final String subtitle;
-//   final List<Color> gradient;
-//   final VoidCallback onTap;
-//   const _SideQuestItem({
-//     required this.icon,
-//     required this.title,
-//     required this.subtitle,
-//     required this.gradient,
-//     required this.onTap,
-//   });
-// }
+class _SideQuestItem {
+  final String icon;
+  final String title;
+  final String subtitle;
+  final List<Color> gradient;
+  final VoidCallback onTap;
+  const _SideQuestItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.gradient,
+    required this.onTap,
+  });
+}

@@ -328,9 +328,7 @@ class _ShakeChallengePageState extends State<ShakeChallengePage>
             if (_answered) {
               if (opt == _currentVocab!.meaning) {
                 btnColor = Colors.green;
-              } else if (opt == _options[_options.indexOf(opt)] &&
-                  !_isCorrect &&
-                  opt != _currentVocab!.meaning) {
+              } else if (!_isCorrect && _answered) {
                 btnColor = Colors.red.withOpacity(0.3);
               }
             }
