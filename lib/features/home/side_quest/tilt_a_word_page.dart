@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sensors_plus/sensors_plus.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../data/local/quest_data.dart';
 import '../../../data/models/quest_model.dart';
 import '../main_quest/quest_provider.dart';

@@ -7,10 +7,14 @@ import 'features/auth/login_page.dart';
 import 'features/auth/lock_screen.dart';
 import 'features/home/main_navigation.dart';
 import 'features/home/main_quest/quest_provider.dart';
+import 'package:timezone/data/latest.dart' as tz;
 
 // lib/main.dart
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  tz.initializeTimeZones();
+
   await dotenv.load(fileName: '.env');
 
   final authProvider = AuthProvider();
