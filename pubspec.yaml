@@ -38,9 +38,12 @@ dependencies:
   http: ^1.2.1
   sensors_plus: ^7.0.0 
 
-  # Format waktu
-  intl: ^0.19.0
+  # LBS
   geolocator: ^11.0.0      # Mengambil koordinat GPS
+  geocoding: ^3.0.0
+
+  # Timezone
+  intl: ^0.19.0
   timezone: ^0.9.4         # Database zona waktu IANA
   lat_lng_to_timezone: ^0.2.0 # Konversi koordinat ke ID Zona Waktu
 
