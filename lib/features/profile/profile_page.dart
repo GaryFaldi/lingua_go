@@ -509,7 +509,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               Switch(
                                 value: profile.biometricEnabled,
                                 onChanged: _toggleBiometric,
-                                activeColor: const Color(0xFF6C63FF),
+                                activeThumbColor: const Color(0xFF6C63FF),
                               ),
                             ],
                           ),
