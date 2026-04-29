@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../auth/auth_provider.dart';
 import 'profile_provider.dart';
+import '../home/main_quest/quest_provider.dart';
+import '../home/side_quest/word_bank_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -310,7 +312,8 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
-    final xpProgress = (user?.xp ?? 0) % 1000;
+    final quest = context.watch<QuestProvider>(); // ✅ tambahkan ini
+    final xpProgress = quest.currentXp % 1000;
 
     return ChangeNotifierProvider.value(
       value: _profileProvider,
@@ -388,7 +391,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Level ${user?.currentLevel ?? 1} — Language Adventurer',
+                                  'Level ${quest.currentLevel} — ${quest.rankTitle}', // ✅ pakai quest
                                   style: const TextStyle(
                                     fontSize: 13,
                                     color: Colors.white70,
@@ -411,7 +414,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ),
                           Text(
-                            '$xpProgress / 1000',
+                            '$xpProgress / 1000', // xpProgress sudah pakai quest di atas
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.white70,
@@ -525,7 +528,9 @@ class _ProfilePageState extends State<ProfilePage> {
                           iconBg: Colors.amber.shade600,
                           title: 'Level Saat Ini',
                           subtitle: 'Main Quest progress',
-                          trailing: _Chip('Lv. ${user?.currentLevel ?? 1}'),
+                          trailing: _Chip(
+                            'Lv. ${quest.currentLevel}',
+                          ), // ✅ ganti dari quest
                         ),
                         _ProfileRow(
                           icon: Icons.menu_book_rounded,
@@ -533,6 +538,13 @@ class _ProfilePageState extends State<ProfilePage> {
                           title: 'Word Bank',
                           subtitle: 'Koleksi kata kamu',
                           trailing: const _Chip('Lihat'),
+                          onTap: () => Navigator.push(
+                            // ✅ tambahkan ini
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const WordBankPage(),
+                            ),
+                          ),
                         ),
                       ],
                     ),

@@ -26,6 +26,9 @@ class _DictionaryPageState extends State<DictionaryPage>
   List<dynamic> _apiResults = [];
   List<VocabItem> _localResults = [];
   String _lastQuery = '';
+  String _translatedQuery = '';
+  String _translatedMeaning = '';
+  bool _isIndonesian = false;
 
   // Filter lokal
   String _selectedCategory = 'Semua';
@@ -76,6 +79,54 @@ class _DictionaryPageState extends State<DictionaryPage>
   }
 
   // ── API Search ────────────────────────────────────────
+  Future<bool> _isIndonesianWord(String word) async {
+    // Deteksi sederhana: coba translate ID→EN, jika berbeda berarti memang ID
+    try {
+      final res = await http.get(
+        Uri.parse(
+          'https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(word)}&langpair=id|en',
+        ),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final translated =
+            data['responseData']['translatedText'] as String? ?? '';
+        // Jika hasil translate berbeda dengan input, kemungkinan besar itu bahasa Indonesia
+        return translated.toLowerCase().trim() != word.toLowerCase().trim();
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<String> _translateToEnglish(String word) async {
+    try {
+      final res = await http.get(
+        Uri.parse(
+          'https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(word)}&langpair=id|en',
+        ),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        return data['responseData']['translatedText'] as String? ?? word;
+      }
+    } catch (_) {}
+    return word;
+  }
+
+  Future<String> _translateToIndonesian(String text) async {
+    try {
+      final res = await http.get(
+        Uri.parse(
+          'https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(text)}&langpair=en|id',
+        ),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        return data['responseData']['translatedText'] as String? ?? text;
+      }
+    } catch (_) {}
+    return text;
+  }
 
   Future<void> _searchOnline(String word) async {
     if (word.isEmpty) return;
@@ -85,16 +136,53 @@ class _DictionaryPageState extends State<DictionaryPage>
       _errorMessage = null;
       _apiResults = [];
       _lastQuery = word;
+      _translatedQuery = '';
+      _translatedMeaning = '';
+      _isIndonesian = false;
     });
 
     try {
+      // 1. Deteksi bahasa
+      final isID = await _isIndonesianWord(word);
+      String queryEN = word;
+
+      if (isID) {
+        // 2a. Terjemahkan ID → EN dulu
+        queryEN = await _translateToEnglish(word);
+        setState(() {
+          _isIndonesian = true;
+          _translatedQuery = queryEN;
+        });
+      }
+
+      // 3. Hit dictionary API dengan kata EN
       final response = await http.get(
-        Uri.parse('https://api.dictionaryapi.dev/api/v2/entries/en/$word'),
+        Uri.parse('https://api.dictionaryapi.dev/api/v2/entries/en/$queryEN'),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List;
-        setState(() => _apiResults = data);
+
+        // 4. Ambil definisi pertama → terjemahkan ke ID
+        String firstDef = '';
+        if (data.isNotEmpty) {
+          final meanings = data.first['meanings'] as List? ?? [];
+          if (meanings.isNotEmpty) {
+            final defs = meanings.first['definitions'] as List? ?? [];
+            if (defs.isNotEmpty) {
+              firstDef = defs.first['definition'] as String? ?? '';
+            }
+          }
+        }
+
+        final translatedDef = firstDef.isNotEmpty
+            ? await _translateToIndonesian(firstDef)
+            : '';
+
+        setState(() {
+          _apiResults = data;
+          _translatedMeaning = translatedDef;
+        });
       } else if (response.statusCode == 404) {
         setState(() => _errorMessage = 'Kata "$word" tidak ditemukan');
       } else {
@@ -110,9 +198,11 @@ class _DictionaryPageState extends State<DictionaryPage>
   void _onSearch() {
     final query = _searchCtrl.text.trim();
     if (query.isEmpty) return;
+
+    setState(() => _lastQuery = query); // ← set dulu sebelum pindah tab
     _loadAllLocal(query: query);
     _searchOnline(query);
-    _tabCtrl.animateTo(1); // pindah ke tab online
+    _tabCtrl.animateTo(1);
   }
 
   @override
@@ -404,9 +494,33 @@ class _DictionaryPageState extends State<DictionaryPage>
 
   Widget _buildOnlineTab() {
     if (_lastQuery.isEmpty) {
-      return _buildEmptyState(
-        '🌐',
-        'Cari kata untuk hasil online\ndari Dictionary API',
+      return Column(
+        children: [
+          // ← Tambah di sini
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.blue.shade50,
+            child: const Row(
+              children: [
+                Icon(Icons.wifi, size: 14, color: Colors.blue),
+                SizedBox(width: 6),
+                Text(
+                  'Fitur ini membutuhkan koneksi internet',
+                  style: TextStyle(fontSize: 12, color: Colors.blue),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: _buildEmptyState(
+                '🌐',
+                'Cari kata dalam Bahasa Inggris atau Indonesia\nhasil akan ditampilkan dengan terjemahan',
+              ),
+            ),
+          ),
+        ],
       );
     }
 
@@ -424,8 +538,67 @@ class _DictionaryPageState extends State<DictionaryPage>
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _apiResults.length,
-      itemBuilder: (_, i) => _buildOnlineCard(context, _apiResults[i]),
+      itemCount: _apiResults.length + 1, // +1 untuk translation banner
+      itemBuilder: (_, i) {
+        if (i == 0) return _buildTranslationBanner();
+        return _buildOnlineCard(context, _apiResults[i - 1]);
+      },
+    );
+  }
+
+  // Banner terjemahan di atas hasil
+  Widget _buildTranslationBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_isIndonesian) ...[
+            Row(
+              children: [
+                const Text('🇮🇩', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 6),
+                Text(
+                  '"$_lastQuery"',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const Text(' → ', style: TextStyle(color: Colors.grey)),
+                const Text('🇬🇧', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 6),
+                Text(
+                  '"$_translatedQuery"',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: AppTheme.primaryBlue,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+          ],
+          if (_translatedMeaning.isNotEmpty) ...[
+            const Text(
+              '📝 Arti dalam Bahasa Indonesia:',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _translatedMeaning,
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

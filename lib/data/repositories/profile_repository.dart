@@ -61,4 +61,22 @@ class ProfileRepository {
       'created_at': DateTime.now().toIso8601String(),
     });
   }
+
+  Future<bool> verifyPassword({
+    required int userId,
+    required String password,
+  }) async {
+    final db = await _dbHelper.database;
+    final results = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    if (results.isEmpty) return false;
+
+    final salt = results.first['salt'] as String;
+    final currentHash = results.first['password_hash'] as String;
+
+    return HashHelper.verifyPassword(password, salt, currentHash);
+  }
 }
