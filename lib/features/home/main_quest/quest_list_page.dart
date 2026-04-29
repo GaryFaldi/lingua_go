@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../data/models/quest_model.dart';
 import 'quest_provider.dart';
 import 'quest_detail_page.dart';
 

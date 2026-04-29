@@ -1,9 +1,9 @@
 // lib/features/home/main_navigation.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../auth/auth_provider.dart';
+import 'package:lingua_go/features/traveler/time_conversion.dart';
 import '../profile/profile_page.dart';
 import 'home_page.dart';
+import '../traveler/traveler_page.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -17,7 +17,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _pages = const [
     HomePage(),
-    _PlaceholderPage(label: 'Traveler Corners', icon: Icons.explore_rounded),
+    TravelerPage(),
     ProfilePage(),
   ];
 
