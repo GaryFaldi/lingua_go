@@ -22,8 +22,8 @@ class ChatBotProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   static String get _apiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
-  static const _apiUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  String get _apiUrl =>
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent';
 
   static const _systemPrompt =
       'Kamu adalah LinguaBot, asisten belajar bahasa Inggris yang ramah dan '
