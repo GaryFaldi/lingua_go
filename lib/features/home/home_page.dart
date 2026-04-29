@@ -9,6 +9,7 @@ import 'side_quest/tilt_a_word_page.dart';
 import 'side_quest/shake_challenge_page.dart';
 import 'side_quest/word_bank_page.dart';
 import 'dictionary/dictionary_page.dart';
+import 'chatbot/chatbot_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -29,7 +30,14 @@ class HomePage extends StatelessWidget {
               // ── Header ──────────────────────────────────
               _buildHeader(context, user?.username ?? 'Pelajar'),
               const SizedBox(height: 20),
-
+              const SizedBox(width: 8),
+              _iconButton(
+                icon: Icons.smart_toy_rounded, // 🤖 icon
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ChatBotPage()),
+                ),
+              ),
               // ── XP Banner ───────────────────────────────
               _buildXpBanner(quest),
               const SizedBox(height: 24),
