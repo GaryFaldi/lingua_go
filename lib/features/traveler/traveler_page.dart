@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'time_conversion.dart'; // Import file jam yang sudah kita buat
+import 'time_conversion.dart';
+import 'currency_page.dart';
 
 class TravelerPage extends StatelessWidget {
   const TravelerPage({super.key});
@@ -41,7 +42,10 @@ class TravelerPage extends StatelessWidget {
                 title: "Currency Converter",
                 subtitle: "Konversi mata uang asing",
                 onTap: () {
-                  // Nanti diisi fitur lain
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CurrencyPage()),
+                  );
                 },
               ),
             ],
