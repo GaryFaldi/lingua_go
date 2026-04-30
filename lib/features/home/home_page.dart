@@ -6,7 +6,7 @@ import 'main_quest/quest_provider.dart';
 import 'main_quest/quest_list_page.dart';
 import 'main_quest/quest_detail_page.dart';
 import 'side_quest/tilt_a_word_page.dart';
-import 'side_quest/shake_challenge_page.dart';
+import 'side_quest/crack_the_egg_page.dart';
 import 'side_quest/word_bank_page.dart';
 import 'dictionary/dictionary_page.dart';
 import 'chatbot/chatbot_page.dart';
@@ -498,12 +498,12 @@ class HomePage extends StatelessWidget {
       ),
       _SideQuestItem(
         icon: '🎲',
-        title: 'Shake!',
+        title: 'Crack the Egg',
         subtitle: 'Kuis Kilat Harian',
         gradient: const [Color(0xFF10B981), Color(0xFF06B6D4)],
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const ShakeChallengePage()),
+          MaterialPageRoute(builder: (_) => const CrackTheEggPage()),
         ),
       ),
       _SideQuestItem(
@@ -629,7 +629,7 @@ class HomePage extends StatelessWidget {
           GestureDetector(
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const ShakeChallengePage()),
+              MaterialPageRoute(builder: (_) => const CrackTheEggPage()),
             ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
