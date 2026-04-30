@@ -44,27 +44,21 @@ class ProfileProvider extends ChangeNotifier {
     return picked.path;
   }
 
-  Future<bool> toggleBiometric(
-    bool value,
-    int userId, {
-    bool skipAuth = false,
-  }) async {
+  Future<bool> toggleBiometric(bool value, int userId) async {
+    // ✅ Terima userId
     if (value) {
-      if (!skipAuth) {
-        // ✅ skip jika sudah diverifikasi via password
-        final canCheck = await _localAuth.canCheckBiometrics;
-        if (!canCheck) return false;
+      final canCheck = await _localAuth.canCheckBiometrics;
+      if (!canCheck) return false;
 
-        final didAuth = await _localAuth.authenticate(
-          localizedReason: 'Konfirmasi untuk mengaktifkan login sidik jari',
-          options: const AuthenticationOptions(biometricOnly: true),
-        );
-        if (!didAuth) return false;
-      }
+      final didAuth = await _localAuth.authenticate(
+        localizedReason: 'Konfirmasi untuk mengaktifkan login sidik jari',
+        options: const AuthenticationOptions(biometricOnly: true),
+      );
+      if (!didAuth) return false;
     }
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_biometricKey(userId), value);
+    await prefs.setBool(_biometricKey(userId), value); // ✅ Key per-user
     _biometricEnabled = value;
     notifyListeners();
     return true;
@@ -94,13 +88,5 @@ class ProfileProvider extends ChangeNotifier {
     required String saran,
   }) async {
     await _repo.saveSuggestion(userId: userId, kesan: kesan, saran: saran);
-  }
-
-  Future<bool> verifyPassword({
-    required int userId,
-    required String password,
-  }) async {
-    if (password.isEmpty) return false;
-    return _repo.verifyPassword(userId: userId, password: password);
   }
 }

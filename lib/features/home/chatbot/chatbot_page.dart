@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'chatbot_provider.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class ChatBotPage extends StatefulWidget {
   const ChatBotPage({super.key});
@@ -302,14 +303,29 @@ class _ChatBotPageState extends State<ChatBotPage> {
                   ),
                 ],
               ),
-              child: Text(
-                msg.text,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isUser ? Colors.white : const Color(0xFF1E293B),
-                  height: 1.4,
-                ),
-              ),
+              child: isUser
+                  ? Text(
+                      msg.text,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.white,
+                        height: 1.4,
+                      ),
+                    )
+                  : MarkdownBody(
+                      data: msg.text,
+                      styleSheet: MarkdownStyleSheet(
+                        p: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF1E293B),
+                          height: 1.4,
+                        ),
+                        strong: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                    ),
             ),
           ),
           if (isUser) const SizedBox(width: 8),
