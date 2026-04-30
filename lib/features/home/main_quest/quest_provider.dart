@@ -1,9 +1,13 @@
+// lib/features/home/main_quest/quest_provider.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/models/quest_model.dart';
 import '../../../data/local/quest_data.dart';
+import '../../../data/local/database_helper.dart';
 
 class QuestProvider extends ChangeNotifier {
+  final int userId; // <-- wajib tahu siapa usernya
+  final DatabaseHelper _db = DatabaseHelper.instance;
+
   List<QuestLevel> _levels = [];
   int _currentXp = 0;
   int _completedLevels = 0;
@@ -15,33 +19,30 @@ class QuestProvider extends ChangeNotifier {
   List<VocabItem> get wordBank => _wordBank;
   int get currentLevel => _completedLevels + 1;
 
-  // Level terbuka berdasarkan progress
   bool isLevelUnlocked(int level) => level <= currentLevel;
 
-  QuestProvider() {
+  QuestProvider({required this.userId}) {
     _init();
   }
 
   Future<void> _init() async {
-    final prefs = await SharedPreferences.getInstance();
-    _currentXp = prefs.getInt('user_xp') ?? 0;
-    _completedLevels = prefs.getInt('completed_levels') ?? 0;
+    // Load progress dari SQLite berdasarkan userId
+    final progress = await _db.getQuestProgress(userId);
+    _currentXp = progress['xp']!;
+    _completedLevels = progress['completed_levels']!;
 
-    // Load word bank
-    final wordBankKeys = prefs.getStringList('word_bank_words') ?? [];
-    final wordBankMeanings = prefs.getStringList('word_bank_meanings') ?? [];
-
-    _wordBank = [];
-    for (int i = 0; i < wordBankKeys.length; i++) {
-      _wordBank.add(
-        VocabItem(
-          word: wordBankKeys[i],
-          meaning: i < wordBankMeanings.length ? wordBankMeanings[i] : '',
-          example: '',
-          category: 'saved',
-        ),
-      );
-    }
+    // Load word bank dari SQLite
+    final rows = await _db.getWordBank(userId);
+    _wordBank = rows
+        .map(
+          (row) => VocabItem(
+            word: row['word'] as String,
+            meaning: row['meaning'] as String? ?? '',
+            example: row['example'] as String? ?? '',
+            category: row['category'] as String? ?? 'saved',
+          ),
+        )
+        .toList();
 
     _levels = QuestData.levels;
     notifyListeners();
@@ -49,18 +50,16 @@ class QuestProvider extends ChangeNotifier {
 
   // Tambah XP setelah selesai level
   Future<void> addXp(int amount) async {
-    final prefs = await SharedPreferences.getInstance();
     _currentXp += amount;
-    await prefs.setInt('user_xp', _currentXp);
+    await _db.updateProgress(userId, _currentXp, _completedLevels);
     notifyListeners();
   }
 
   // Tandai level selesai
   Future<void> completeLevel(int level) async {
     if (level > _completedLevels) {
-      final prefs = await SharedPreferences.getInstance();
       _completedLevels = level;
-      await prefs.setInt('completed_levels', _completedLevels);
+      await _db.updateProgress(userId, _currentXp, _completedLevels);
       notifyListeners();
     }
   }
@@ -70,40 +69,26 @@ class QuestProvider extends ChangeNotifier {
     if (_wordBank.any((v) => v.word == vocab.word)) return;
 
     _wordBank.add(vocab);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-      'word_bank_words',
-      _wordBank.map((v) => v.word).toList(),
+    await _db.addWordToBank(
+      userId,
+      word: vocab.word,
+      meaning: vocab.meaning,
+      example: vocab.example,
+      category: vocab.category,
     );
-    await prefs.setStringList(
-      'word_bank_meanings',
-      _wordBank.map((v) => v.meaning).toList(),
-    );
-
     notifyListeners();
   }
 
   // Hapus dari Word Bank
   Future<void> removeFromWordBank(String word) async {
     _wordBank.removeWhere((v) => v.word == word);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-      'word_bank_words',
-      _wordBank.map((v) => v.word).toList(),
-    );
-    await prefs.setStringList(
-      'word_bank_meanings',
-      _wordBank.map((v) => v.meaning).toList(),
-    );
-
+    await _db.removeWordFromBank(userId, word);
     notifyListeners();
   }
 
   bool isInWordBank(String word) => _wordBank.any((v) => v.word == word);
 
-  // Level title berdasarkan XP
+  // Rank berdasarkan XP
   String get rankTitle {
     if (_currentXp >= 3000) return '🏆 Grand Master';
     if (_currentXp >= 2000) return '💎 Diamond';
