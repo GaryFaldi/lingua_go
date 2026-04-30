@@ -22,8 +22,9 @@ class ChatBotProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   static String get _apiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
-  String get _apiUrl =>
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent';
+
+  static const _apiUrl =
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
   static const _systemPrompt =
       'Kamu adalah LinguaBot, asisten belajar bahasa Inggris yang ramah dan '
@@ -38,11 +39,6 @@ class ChatBotProvider extends ChangeNotifier {
       ChatMessage(
         text:
             '👋 Halo! Aku LinguaBot, teman belajar bahasa Inggrismu!\n\n'
-            'Kamu bisa tanya:\n'
-            '• Arti & contoh kalimat sebuah kata\n'
-            '• Cara grammar yang benar\n'
-            '• Tips pronunciation\n'
-            '• Latihan percakapan\n\n'
             'Mau belajar apa hari ini? 😊',
         isUser: false,
         time: DateTime.now(),
@@ -58,17 +54,17 @@ class ChatBotProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Ambil 5 pesan user terakhir sebagai history
+      // PERBAIKAN HISTORY: Masukkan role 'user' dan 'model'
       final history = _messages
-          .where((m) => m.isUser)
-          .toList()
-          .reversed
-          .take(5)
-          .toList()
-          .reversed
+          .take(
+            _messages.length - 1,
+          ) // Ambil semua kecuali pesan terakhir yang baru diketik
+          .where(
+            (m) => m.text.isNotEmpty && !m.text.startsWith('⚠️'),
+          ) // Abaikan pesan error
           .map(
             (m) => {
-              'role': 'user',
+              'role': m.isUser ? 'user' : 'model',
               'parts': [
                 {'text': m.text},
               ],
@@ -94,7 +90,11 @@ class ChatBotProvider extends ChangeNotifier {
               ],
             },
           ],
-          'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 500},
+          'generationConfig': {
+            'temperature': 0.7,
+            'maxOutputTokens': 500,
+            'topP': 0.95,
+          },
         }),
       );
 
@@ -105,12 +105,32 @@ class ChatBotProvider extends ChangeNotifier {
         _messages.add(
           ChatMessage(text: reply, isUser: false, time: DateTime.now()),
         );
+      } else if (response.statusCode == 429) {
+        // TANGKAP ERROR KUOTA
+        debugPrint('=== RATE LIMIT 429 ===');
+        debugPrint('Response body: ${response.body}'); // TAMBAH INI
+        _messages.add(
+          ChatMessage(
+            text:
+                '⚠️ LinguaBot lagi sibuk banget. Tunggu 1 menit ya, baru tanya lagi!',
+            isUser: false,
+            time: DateTime.now(),
+          ),
+        );
+      } else if (response.statusCode == 503) {
+        await Future.delayed(const Duration(seconds: 3));
+        // Hapus pesan user yang tadi ditambahkan, baru retry
+        _messages.removeLast();
+        _isLoading = false;
+        await sendMessage(text);
+        return;
       } else {
-        debugPrint('Status: ${response.statusCode}');
-        debugPrint('Body: ${response.body}');
+        debugPrint('=== ERROR ${response.statusCode} ===');
+        debugPrint('Error: ${response.body}');
         _addErrorMessage();
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Catch Error: $e');
       _addErrorMessage();
     } finally {
       _isLoading = false;
