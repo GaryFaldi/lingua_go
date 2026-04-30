@@ -9,10 +9,9 @@ import 'features/home/main_navigation.dart';
 import 'features/home/main_quest/quest_provider.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
-// lib/main.dart
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   tz.initializeTimeZones();
 
   await dotenv.load(fileName: '.env');
@@ -29,11 +28,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: authProvider),
-        ChangeNotifierProvider(create: (_) => QuestProvider()),
-      ],
+    return ChangeNotifierProvider.value(
+      value: authProvider,
       child: MaterialApp(
         title: 'LinguaQuest',
         debugShowCheckedModeBanner: false,
@@ -47,7 +43,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// AuthGate sekarang simple, tidak perlu initState lagi
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -71,10 +66,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
-      // App masuk background → lock
       final auth = context.read<AuthProvider>();
       if (auth.isLoggedIn) {
-        auth.logout(); // set lockedUsername, clear currentUser
+        auth.logout();
       }
     }
   }
@@ -83,7 +77,15 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
-        if (auth.isLoggedIn) return const MainNavigation();
+        if (auth.isLoggedIn) {
+          // QuestProvider dibuat di sini, setelah user diketahui
+          // Key pakai userId supaya otomatis rebuild kalau ganti user
+          return ChangeNotifierProvider(
+            key: ValueKey(auth.currentUser!.id),
+            create: (_) => QuestProvider(userId: auth.currentUser!.id!),
+            child: const MainNavigation(),
+          );
+        }
         if (auth.lockedUsername != null) return const LockScreen();
         return const LoginPage();
       },
