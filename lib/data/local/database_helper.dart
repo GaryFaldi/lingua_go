@@ -184,6 +184,12 @@ class DatabaseHelper {
       UNIQUE(user_id, feature, attempt_date)
     )
   ''');
+    try {
+      await db.execute('ALTER TABLE word_bank ADD COLUMN example TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE word_bank ADD COLUMN category TEXT');
+    } catch (_) {}
   }
 
   /// Update XP dan completed_levels sekaligus (atomic)
