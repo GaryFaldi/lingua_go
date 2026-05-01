@@ -85,6 +85,7 @@ class QuestProvider extends ChangeNotifier {
       example: vocab.example,
       category: vocab.category,
     );
+    debugPrint('addToWordBank: "${vocab.word}" disimpan untuk userId=$userId');
     notifyListeners();
   }
 
