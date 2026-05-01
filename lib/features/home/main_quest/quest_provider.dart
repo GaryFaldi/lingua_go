@@ -59,6 +59,7 @@ class QuestProvider extends ChangeNotifier {
   // Tambah XP setelah selesai level
   Future<void> addXp(int amount) async {
     _currentXp += amount;
+    debugPrint('addXp: userId=$userId, newXp=$_currentXp'); // ← tambah
     await _db.updateProgress(userId, _currentXp, _completedLevels);
     notifyListeners();
   }
