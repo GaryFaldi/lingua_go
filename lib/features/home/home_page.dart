@@ -509,8 +509,10 @@ class HomePage extends StatelessWidget {
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                CrackTheEggPage(questProvider: context.read<QuestProvider>()),
+            builder: (_) => CrackTheEggPage(
+              questProvider: context.read<QuestProvider>(),
+              userId: context.read<QuestProvider>().userId, // ← tambah ini
+            ),
           ),
         ),
       ),
@@ -640,6 +642,7 @@ class HomePage extends StatelessWidget {
               MaterialPageRoute(
                 builder: (_) => CrackTheEggPage(
                   questProvider: context.read<QuestProvider>(),
+                  userId: context.read<QuestProvider>().userId,
                 ),
               ),
             ),

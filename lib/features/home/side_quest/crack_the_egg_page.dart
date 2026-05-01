@@ -7,12 +7,18 @@ import 'package:sensors_plus/sensors_plus.dart';
 import '../../../data/local/quest_data.dart';
 import '../../../data/models/quest_model.dart';
 import '../main_quest/quest_provider.dart';
+import '../../../data/local/database_helper.dart';
 
 enum EggState { whole, cracked, broken }
 
 class CrackTheEggPage extends StatefulWidget {
   final QuestProvider questProvider; // <-- terima dari luar
-  const CrackTheEggPage({super.key, required this.questProvider});
+  final int userId;
+  const CrackTheEggPage({
+    super.key,
+    required this.questProvider,
+    required this.userId,
+  });
 
   @override
   State<CrackTheEggPage> createState() => _CrackTheEggPageState();
@@ -30,6 +36,8 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
   int _eggsOpened = 0;
   static const int _maxEggs = 3;
   int _totalXp = 0;
+  bool _isLoadingAttempts = true; // ← tambah
+  bool _limitReached = false;
   bool _sessionDone = false;
 
   VocabItem? _rewardVocab;
@@ -82,8 +90,21 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
       parent: _rewardCtrl,
       curve: Curves.elasticOut,
     );
-
+    _checkDailyLimit();
     _startListening();
+  }
+
+  Future<void> _checkDailyLimit() async {
+    final db = DatabaseHelper.instance;
+    final count = await db.getDailyAttempts(widget.userId, 'crack_the_egg');
+    debugPrint('_checkDailyLimit: userId=${widget.userId}, count=$count');
+    if (!mounted) return;
+    setState(() {
+      _eggsOpened = count;
+      _limitReached = count >= _maxEggs;
+      _isLoadingAttempts = false;
+    });
+    if (!_limitReached) _startListening();
   }
 
   void _startListening() {
@@ -139,16 +160,16 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
   }
 
   Future<void> _collectReward() async {
+    if (!mounted) return;
+
     final newEggsOpened = _eggsOpened + 1;
     final isDone = newEggsOpened >= _maxEggs;
     final xpToAdd = _rewardXp;
 
-    // Sembunyikan overlay dulu (sync, sebelum await)
     setState(() {
       _showingReward = false;
       _totalXp += xpToAdd;
       _eggsOpened = newEggsOpened;
-
       if (!isDone) {
         _eggState = EggState.whole;
         _shakeCount = 0;
@@ -161,11 +182,20 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
     _rewardCtrl.reset();
     _wobbleCtrl.reset();
 
-    // Pakai widget.questProvider — tidak perlu context.read sama sekali
-    await widget.questProvider.addXp(xpToAdd);
+    try {
+      debugPrint('incrementDailyAttempt: userId=${widget.userId}');
+      await DatabaseHelper.instance.incrementDailyAttempt(
+        widget.userId,
+        'crack_the_egg',
+      );
+      debugPrint('addXp: xp=$xpToAdd');
+      await widget.questProvider.addXp(xpToAdd);
+      debugPrint('addXp done, currentXp=${widget.questProvider.currentXp}');
+    } catch (e) {
+      debugPrint('_collectReward error: $e');
+    }
 
     if (isDone) {
-      await Future.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
       setState(() => _sessionDone = true);
     }
@@ -207,7 +237,47 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
           ),
         ],
       ),
-      body: _sessionDone ? _buildSessionDone() : _buildGame(),
+      body: _limitReached
+          ? _buildLimitReached()
+          : _sessionDone
+          ? _buildSessionDone()
+          : _buildGame(),
+    );
+  }
+
+  Widget _buildLimitReached() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(30),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('🥚', style: TextStyle(fontSize: 80)),
+            const SizedBox(height: 16),
+            const Text(
+              'Sudah 3x main hari ini!',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Kembali lagi besok untuk main lagi.',
+              style: TextStyle(color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 40),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Kembali ke Home'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

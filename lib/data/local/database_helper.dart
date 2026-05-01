@@ -2,6 +2,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -17,7 +18,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final dbName = dotenv.env['DB_NAME'] ?? 'linguaquest.db';
-    final dbVersion = int.tryParse(dotenv.env['DB_VERSION'] ?? '2') ?? 2;
+    final dbVersion = int.tryParse(dotenv.env['DB_VERSION'] ?? '3') ?? 3;
     final dbPath = join(await getDatabasesPath(), dbName);
 
     return await openDatabase(
@@ -74,6 +75,17 @@ class DatabaseHelper {
       xp INTEGER DEFAULT 0,
       completed_levels INTEGER DEFAULT 0,
       FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  ''');
+
+    await db.execute('''
+    CREATE TABLE IF NOT EXISTS daily_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      feature TEXT NOT NULL,
+      attempt_date TEXT NOT NULL,
+      count INTEGER DEFAULT 0,
+      UNIQUE(user_id, feature, attempt_date)
     )
   ''');
   }
@@ -161,6 +173,17 @@ class DatabaseHelper {
       UNIQUE(user_id, word)
     )
   ''');
+
+    await db.execute('''
+    CREATE TABLE IF NOT EXISTS daily_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      feature TEXT NOT NULL,
+      attempt_date TEXT NOT NULL,
+      count INTEGER DEFAULT 0,
+      UNIQUE(user_id, feature, attempt_date)
+    )
+  ''');
   }
 
   /// Update XP dan completed_levels sekaligus (atomic)
@@ -171,12 +194,16 @@ class DatabaseHelper {
       where: 'user_id = ?',
       whereArgs: [userId],
     );
+    debugPrint(
+      'updateProgress: userId=$userId xp=$xp existing=${existing.length}',
+    ); // ← tambah
     if (existing.isEmpty) {
       await db.insert('quest_progress', {
         'user_id': userId,
         'xp': xp,
         'completed_levels': completedLevels,
       });
+      debugPrint('updateProgress: INSERT done'); // ← tambah
     } else {
       await db.update(
         'quest_progress',
@@ -184,6 +211,7 @@ class DatabaseHelper {
         where: 'user_id = ?',
         whereArgs: [userId],
       );
+      debugPrint('updateProgress: UPDATE done'); // ← tambah
     }
   }
 
@@ -231,6 +259,48 @@ class DatabaseHelper {
       where: 'user_id = ? AND word = ?',
       whereArgs: [userId, word],
     );
+  }
+
+  Future<int> getDailyAttempts(int userId, String feature) async {
+    final db = await database;
+    final today = DateTime.now().toIso8601String().substring(
+      0,
+      10,
+    ); // "2024-01-15"
+    final result = await db.query(
+      'daily_attempts',
+      where: 'user_id = ? AND feature = ? AND attempt_date = ?',
+      whereArgs: [userId, feature, today],
+    );
+    if (result.isEmpty) return 0;
+    return result.first['count'] as int;
+  }
+
+  Future<void> incrementDailyAttempt(int userId, String feature) async {
+    final db = await database;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
+    final existing = await db.query(
+      'daily_attempts',
+      where: 'user_id = ? AND feature = ? AND attempt_date = ?',
+      whereArgs: [userId, feature, today],
+    );
+
+    if (existing.isEmpty) {
+      // Belum ada row hari ini → INSERT dengan count = 1
+      await db.insert('daily_attempts', {
+        'user_id': userId,
+        'feature': feature,
+        'attempt_date': today,
+        'count': 1,
+      });
+    } else {
+      // Sudah ada → tambah 1
+      await db.rawUpdate(
+        'UPDATE daily_attempts SET count = count + 1 WHERE user_id = ? AND feature = ? AND attempt_date = ?',
+        [userId, feature, today],
+      );
+    }
   }
 
   Future<void> close() async {
