@@ -3,7 +3,7 @@ class UserModel {
   final int? id;
   final String username;
   final String passwordHash;
-  final String salt; // pakai username sebagai salt
+  final String salt;
   final String? photoPath;
   final int xp;
   final int currentLevel;

@@ -15,11 +15,7 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = const [
-    HomePage(),
-    TravelerPage(),
-    ProfilePage(),
-  ];
+  final List<Widget> _pages = const [HomePage(), TravelerPage(), ProfilePage()];
 
   @override
   Widget build(BuildContext context) {

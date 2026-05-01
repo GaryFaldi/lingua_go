@@ -18,7 +18,12 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
     final quest = context.watch<QuestProvider>();
-
+    if (quest.isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF0F4FF),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4FF),
       body: SafeArea(
@@ -30,14 +35,6 @@ class HomePage extends StatelessWidget {
               // ── Header ──────────────────────────────────
               _buildHeader(context, user?.username ?? 'Pelajar'),
               const SizedBox(height: 20),
-              const SizedBox(width: 8),
-              _iconButton(
-                icon: Icons.smart_toy_rounded, // 🤖 icon
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ChatBotPage()),
-                ),
-              ),
               // ── XP Banner ───────────────────────────────
               _buildXpBanner(quest),
               const SizedBox(height: 24),
@@ -102,7 +99,16 @@ class HomePage extends StatelessWidget {
           ),
         ),
 
-        // Search button
+        // ← Chatbot dipindah ke sini
+        _iconButton(
+          icon: Icons.smart_toy_rounded,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ChatBotPage()),
+          ),
+        ),
+        const SizedBox(width: 8),
+
         _iconButton(
           icon: Icons.search,
           onTap: () => Navigator.push(
@@ -112,7 +118,6 @@ class HomePage extends StatelessWidget {
         ),
         const SizedBox(width: 8),
 
-        // Word bank button
         _iconButton(
           icon: Icons.bookmark_outlined,
           onTap: () => Navigator.push(
@@ -503,7 +508,10 @@ class HomePage extends StatelessWidget {
         gradient: const [Color(0xFF10B981), Color(0xFF06B6D4)],
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const CrackTheEggPage()),
+          MaterialPageRoute(
+            builder: (_) =>
+                CrackTheEggPage(questProvider: context.read<QuestProvider>()),
+          ),
         ),
       ),
       _SideQuestItem(
@@ -629,7 +637,11 @@ class HomePage extends StatelessWidget {
           GestureDetector(
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const CrackTheEggPage()),
+              MaterialPageRoute(
+                builder: (_) => CrackTheEggPage(
+                  questProvider: context.read<QuestProvider>(),
+                ),
+              ),
             ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

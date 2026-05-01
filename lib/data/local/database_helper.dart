@@ -17,64 +17,65 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final dbName = dotenv.env['DB_NAME'] ?? 'linguaquest.db';
-    final dbVersion = int.tryParse(dotenv.env['DB_VERSION'] ?? '1') ?? 1;
+    final dbVersion = int.tryParse(dotenv.env['DB_VERSION'] ?? '2') ?? 2;
     final dbPath = join(await getDatabasesPath(), dbName);
 
-    return await openDatabase(dbPath, version: dbVersion, onCreate: _createDB);
+    return await openDatabase(
+      dbPath,
+      version: dbVersion,
+      onCreate: _createDB,
+      onUpgrade: _onUpgrade,
+    );
   }
 
   Future<void> _createDB(Database db, int version) async {
-    // Tabel users
     await db.execute('''
-      CREATE TABLE users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        salt TEXT NOT NULL,
-        photo_path TEXT,
-        xp INTEGER DEFAULT 0,
-        current_level INTEGER DEFAULT 1,
-        created_at TEXT NOT NULL
-      )
-    ''');
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      salt TEXT NOT NULL,
+      photo_path TEXT,
+      xp INTEGER DEFAULT 0,
+      current_level INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL
+    )
+  ''');
 
-    // Tabel suggestions (kesan & saran TPM)
     await db.execute('''
-      CREATE TABLE suggestions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        kesan TEXT,
-        saran TEXT,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-      )
-    ''');
+    CREATE TABLE IF NOT EXISTS suggestions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      kesan TEXT,
+      saran TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  ''');
 
-    // Tabel word_bank (vocab simpanan per user)
     await db.execute('''
-      CREATE TABLE word_bank (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        word TEXT NOT NULL,
-        meaning TEXT,
-        example TEXT,
-        category TEXT,
-        added_at TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        UNIQUE(user_id, word)
-      )
-    ''');
+    CREATE TABLE IF NOT EXISTS word_bank (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      word TEXT NOT NULL,
+      meaning TEXT,
+      example TEXT,
+      category TEXT,
+      added_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(user_id, word)
+    )
+  ''');
 
-    // Tabel quest_progress (progress level per user)
     await db.execute('''
-      CREATE TABLE quest_progress (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL UNIQUE,
-        xp INTEGER DEFAULT 0,
-        completed_levels INTEGER DEFAULT 0,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-      )
-    ''');
+    CREATE TABLE IF NOT EXISTS quest_progress (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE,
+      xp INTEGER DEFAULT 0,
+      completed_levels INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  ''');
   }
 
   // ── Quest Progress ──────────────────────────────────────
@@ -134,6 +135,32 @@ class DatabaseHelper {
         whereArgs: [userId],
       );
     }
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    await db.execute('''
+    CREATE TABLE IF NOT EXISTS quest_progress (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE,
+      xp INTEGER DEFAULT 0,
+      completed_levels INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  ''');
+
+    await db.execute('''
+    CREATE TABLE IF NOT EXISTS word_bank (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      word TEXT NOT NULL,
+      meaning TEXT,
+      example TEXT,
+      category TEXT,
+      added_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(user_id, word)
+    )
+  ''');
   }
 
   /// Update XP dan completed_levels sekaligus (atomic)
