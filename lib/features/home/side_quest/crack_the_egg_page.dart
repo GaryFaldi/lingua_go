@@ -3,7 +3,6 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import '../../../data/local/quest_data.dart';
 import '../../../data/models/quest_model.dart';
@@ -12,7 +11,8 @@ import '../main_quest/quest_provider.dart';
 enum EggState { whole, cracked, broken }
 
 class CrackTheEggPage extends StatefulWidget {
-  const CrackTheEggPage({super.key});
+  final QuestProvider questProvider; // <-- terima dari luar
+  const CrackTheEggPage({super.key, required this.questProvider});
 
   @override
   State<CrackTheEggPage> createState() => _CrackTheEggPageState();
@@ -22,29 +22,24 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
     with TickerProviderStateMixin {
   StreamSubscription<AccelerometerEvent>? _sub;
 
-  // Egg state
   EggState _eggState = EggState.whole;
   int _shakeCount = 0;
   static const int _shakesToCrack = 3;
   static const int _shakesToBreak = 6;
 
-  // Session
   int _eggsOpened = 0;
   static const int _maxEggs = 3;
   int _totalXp = 0;
   bool _sessionDone = false;
 
-  // Reward
   VocabItem? _rewardVocab;
   int _rewardXp = 0;
   bool _showingReward = false;
 
-  // Shake detection
   double _lastX = 0, _lastY = 0, _lastZ = 0;
   static const double _shakeThreshold = 12.0;
   DateTime _lastShake = DateTime.now();
 
-  // Animations
   late AnimationController _wobbleCtrl;
   late Animation<double> _wobbleAnim;
   late AnimationController _crackCtrl;
@@ -117,7 +112,6 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
   void _onShake() {
     HapticFeedback.mediumImpact();
     _wobbleCtrl.forward(from: 0);
-
     setState(() => _shakeCount++);
 
     if (_shakeCount >= _shakesToBreak) {
@@ -132,11 +126,10 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
     setState(() => _eggState = EggState.broken);
     _burstCtrl.forward(from: 0);
 
-    // Generate reward
     final allVocabs = QuestData.levels.expand((l) => l.vocabs).toList();
     allVocabs.shuffle();
     _rewardVocab = allVocabs.first;
-    _rewardXp = 10 + _rand.nextInt(41); // 10–50 XP random
+    _rewardXp = 10 + _rand.nextInt(41);
 
     Future.delayed(const Duration(milliseconds: 700), () {
       if (!mounted) return;
@@ -146,18 +139,17 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
   }
 
   Future<void> _collectReward() async {
-    final quest = context.read<QuestProvider>();
-    await quest.addXp(_rewardXp);
+    final newEggsOpened = _eggsOpened + 1;
+    final isDone = newEggsOpened >= _maxEggs;
+    final xpToAdd = _rewardXp;
 
+    // Sembunyikan overlay dulu (sync, sebelum await)
     setState(() {
-      _totalXp += _rewardXp;
-      _eggsOpened++;
       _showingReward = false;
+      _totalXp += xpToAdd;
+      _eggsOpened = newEggsOpened;
 
-      if (_eggsOpened >= _maxEggs) {
-        _sessionDone = true;
-      } else {
-        // Reset untuk telur berikutnya
+      if (!isDone) {
         _eggState = EggState.whole;
         _shakeCount = 0;
         _rewardVocab = null;
@@ -168,6 +160,15 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
     _burstCtrl.reset();
     _rewardCtrl.reset();
     _wobbleCtrl.reset();
+
+    // Pakai widget.questProvider — tidak perlu context.read sama sekali
+    await widget.questProvider.addXp(xpToAdd);
+
+    if (isDone) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+      setState(() => _sessionDone = true);
+    }
   }
 
   @override
@@ -179,8 +180,6 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
     _rewardCtrl.dispose();
     super.dispose();
   }
-
-  // ── Build ──────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -215,14 +214,10 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
   Widget _buildGame() {
     return Stack(
       children: [
-        // Main content
         Column(
           children: [
-            // XP bar atas
             _buildXpBar(),
             const SizedBox(height: 20),
-
-            // Instruksi
             Text(
               _eggState == EggState.whole
                   ? 'Guncang HP untuk memecahkan telur!'
@@ -236,28 +231,19 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
               ),
             ),
             const SizedBox(height: 8),
-
-            // Progress shake
             if (!_showingReward) _buildShakeProgress(),
-
             const SizedBox(height: 30),
-
-            // Telur + burst
             Expanded(
               child: Center(
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Burst particles
                     if (_eggState == EggState.broken) _buildBurst(),
-                    // Telur
                     _buildEgg(),
                   ],
                 ),
               ),
             ),
-
-            // Tombol manual
             if (!_showingReward)
               Padding(
                 padding: const EdgeInsets.only(bottom: 30),
@@ -273,8 +259,6 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
               ),
           ],
         ),
-
-        // Reward overlay
         if (_showingReward) _buildRewardOverlay(),
       ],
     );
@@ -349,9 +333,7 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
     return AnimatedBuilder(
       animation: Listenable.merge([_wobbleCtrl, _burstCtrl]),
       builder: (_, child) {
-        // Wobble kiri-kanan
         final wobble = sin(_wobbleAnim.value * pi * 4) * 12;
-        // Scale burst
         final burstScale = _eggState == EggState.broken
             ? (1.0 + _burstAnim.value * 0.4)
             : 1.0;
@@ -374,15 +356,11 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
   Widget _buildBurst() {
     return AnimatedBuilder(
       animation: _burstCtrl,
-      builder: (_, __) {
-        return SizedBox(
-          width: 300,
-          height: 300,
-          child: CustomPaint(
-            painter: _BurstPainter(progress: _burstAnim.value),
-          ),
-        );
-      },
+      builder: (_, __) => SizedBox(
+        width: 300,
+        height: 300,
+        child: CustomPaint(painter: _BurstPainter(progress: _burstAnim.value)),
+      ),
     );
   }
 
@@ -400,25 +378,15 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.amber.withOpacity(0.4),
-                  blurRadius: 30,
-                  spreadRadius: 5,
-                ),
-              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Judul
                 const Text(
                   '🥳 Telur Pecah!',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
-
-                // XP reward
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -439,8 +407,6 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
                   ),
                 ),
                 const SizedBox(height: 20),
-
-                // Vocab reward
                 const Text(
                   'Kamu dapat kata baru:',
                   style: TextStyle(color: Colors.grey, fontSize: 13),
@@ -485,7 +451,6 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Contoh kalimat
                 if (_rewardVocab?.example.isNotEmpty ?? false)
                   Text(
                     '"${_rewardVocab!.example}"',
@@ -496,10 +461,7 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
                     ),
                     textAlign: TextAlign.center,
                   ),
-
                 const SizedBox(height: 20),
-
-                // Tombol collect
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -621,7 +583,6 @@ class _EggPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
 
-    // Bentuk telur dengan path
     final path = Path();
     path.moveTo(cx, cy - size.height * 0.45);
     path.cubicTo(
@@ -645,7 +606,6 @@ class _EggPainter extends CustomPainter {
     canvas.drawPath(path, paint);
     canvas.drawPath(path, strokePaint);
 
-    // Kilap
     final shinePaint = Paint()
       ..color = Colors.white.withOpacity(0.5)
       ..style = PaintingStyle.fill;
@@ -654,7 +614,6 @@ class _EggPainter extends CustomPainter {
       shinePaint,
     );
 
-    // Crack lines kalau sudah retak
     if (state == EggState.cracked || state == EggState.broken) {
       _drawCracks(canvas, cx, cy, size);
     }
@@ -667,7 +626,6 @@ class _EggPainter extends CustomPainter {
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
 
-    // Retakan tengah
     final crack1 = Path();
     crack1.moveTo(cx - 20, cy - 20);
     crack1.lineTo(cx - 5, cy - 5);
@@ -676,7 +634,6 @@ class _EggPainter extends CustomPainter {
     crack1.lineTo(cx + 20, cy + 10);
     canvas.drawPath(crack1, crackPaint);
 
-    // Retakan kiri
     final crack2 = Path();
     crack2.moveTo(cx - 30, cy + 5);
     crack2.lineTo(cx - 15, cy - 2);
@@ -684,7 +641,6 @@ class _EggPainter extends CustomPainter {
     canvas.drawPath(crack2, crackPaint);
 
     if (state == EggState.broken) {
-      // Retakan tambahan
       final crack3 = Path();
       crack3.moveTo(cx + 10, cy + 20);
       crack3.lineTo(cx + 25, cy + 5);
@@ -727,13 +683,10 @@ class _BurstPainter extends CustomPainter {
       final angle = (i / 16) * 2 * pi + rand.nextDouble() * 0.3;
       final speed = 60 + rand.nextDouble() * 60;
       final radius = 4 + rand.nextDouble() * 6;
-
       final dx = cos(angle) * speed * progress;
       final dy = sin(angle) * speed * progress;
-
       final opacity = (1.0 - progress).clamp(0.0, 1.0);
       final color = colors[i % colors.length].withOpacity(opacity);
-
       final paint = Paint()..color = color;
       canvas.drawCircle(
         Offset(cx + dx, cy + dy),
@@ -742,7 +695,6 @@ class _BurstPainter extends CustomPainter {
       );
     }
 
-    // Yolk splash (kuning telur)
     if (progress > 0.1) {
       final yolkPaint = Paint()
         ..color = Colors.yellow.shade600.withOpacity(

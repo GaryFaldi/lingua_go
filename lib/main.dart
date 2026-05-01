@@ -11,9 +11,7 @@ import 'package:timezone/data/latest.dart' as tz;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   tz.initializeTimeZones();
-
   await dotenv.load(fileName: '.env');
 
   final authProvider = AuthProvider();
@@ -28,8 +26,22 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: authProvider,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: authProvider),
+
+        // QuestProvider otomatis dibuat ulang saat user login/ganti akun
+        ChangeNotifierProxyProvider<AuthProvider, QuestProvider?>(
+          create: (_) => null,
+          update: (_, auth, previous) {
+            if (auth.currentUser == null) return null;
+            if (previous != null && previous.userId == auth.currentUser!.id!) {
+              return previous;
+            }
+            return QuestProvider(userId: auth.currentUser!.id!);
+          },
+        ),
+      ],
       child: MaterialApp(
         title: 'LinguaQuest',
         debugShowCheckedModeBanner: false,
@@ -67,9 +79,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
       final auth = context.read<AuthProvider>();
-      if (auth.isLoggedIn) {
-        auth.logout();
-      }
+      if (auth.isLoggedIn) auth.logout();
     }
   }
 
@@ -77,15 +87,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
-        if (auth.isLoggedIn) {
-          // QuestProvider dibuat di sini, setelah user diketahui
-          // Key pakai userId supaya otomatis rebuild kalau ganti user
-          return ChangeNotifierProvider(
-            key: ValueKey(auth.currentUser!.id),
-            create: (_) => QuestProvider(userId: auth.currentUser!.id!),
-            child: const MainNavigation(),
-          );
-        }
+        if (auth.isLoggedIn) return const MainNavigation();
         if (auth.lockedUsername != null) return const LockScreen();
         return const LoginPage();
       },

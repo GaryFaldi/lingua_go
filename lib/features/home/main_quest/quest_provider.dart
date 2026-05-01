@@ -12,13 +12,14 @@ class QuestProvider extends ChangeNotifier {
   int _currentXp = 0;
   int _completedLevels = 0;
   List<VocabItem> _wordBank = [];
+  bool _isLoading = true;
 
   List<QuestLevel> get levels => _levels;
   int get currentXp => _currentXp;
   int get completedLevels => _completedLevels;
   List<VocabItem> get wordBank => _wordBank;
   int get currentLevel => _completedLevels + 1;
-
+  bool get isLoading => _isLoading;
   bool isLevelUnlocked(int level) => level <= currentLevel;
 
   QuestProvider({required this.userId}) {
@@ -26,26 +27,33 @@ class QuestProvider extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    // Load progress dari SQLite berdasarkan userId
-    final progress = await _db.getQuestProgress(userId);
-    _currentXp = progress['xp']!;
-    _completedLevels = progress['completed_levels']!;
-
-    // Load word bank dari SQLite
-    final rows = await _db.getWordBank(userId);
-    _wordBank = rows
-        .map(
-          (row) => VocabItem(
-            word: row['word'] as String,
-            meaning: row['meaning'] as String? ?? '',
-            example: row['example'] as String? ?? '',
-            category: row['category'] as String? ?? 'saved',
-          ),
-        )
-        .toList();
-
-    _levels = QuestData.levels;
+    _isLoading = true;
     notifyListeners();
+
+    try {
+      final progress = await _db.getQuestProgress(userId);
+      _currentXp = progress['xp']!;
+      _completedLevels = progress['completed_levels']!;
+
+      final rows = await _db.getWordBank(userId);
+      _wordBank = rows
+          .map(
+            (row) => VocabItem(
+              word: row['word'] as String,
+              meaning: row['meaning'] as String? ?? '',
+              example: row['example'] as String? ?? '',
+              category: row['category'] as String? ?? 'saved',
+            ),
+          )
+          .toList();
+
+      _levels = QuestData.levels;
+    } catch (e) {
+      debugPrint('QuestProvider _init error: $e'); // ← lihat di console
+    } finally {
+      _isLoading = false; // ← SELALU jalan, error atau tidak
+      notifyListeners();
+    }
   }
 
   // Tambah XP setelah selesai level
