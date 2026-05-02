@@ -1,9 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'time_conversion.dart';
 import 'currency_page.dart';
+import 'language_center_page.dart';
 
 class TravelerPage extends StatelessWidget {
   const TravelerPage({super.key});
+
+  Future<void> _openMap(String query) async {
+    // Mencari tempat kursus atau sertifikasi terdekat
+    final String googleMapsUrl =
+        "https://www.google.com/maps/search/?api=1&query=$query";
+    final Uri uri = Uri.parse(googleMapsUrl);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      throw 'Tidak bisa membuka peta.';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,8 +27,10 @@ class TravelerPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Traveler Corners', 
-          style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Traveler Corners',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -32,7 +49,9 @@ class TravelerPage extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const TimeConversionPage()),
+                    MaterialPageRoute(
+                      builder: (context) => const TimeConversionPage(),
+                    ),
                   );
                 },
               ),
@@ -44,36 +63,90 @@ class TravelerPage extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const CurrencyPage()),
+                    MaterialPageRoute(
+                      builder: (context) => const CurrencyPage(),
+                    ),
                   );
                 },
               ),
             ],
           ),
           const SizedBox(height: 20),
-          _buildMenuSection(
-            title: "Information",
-            items: [
-              _buildMenuCard(
-                icon: Icons.translate_rounded,
-                iconColor: Colors.orange,
-                title: "Travel Phrases",
-                subtitle: "Kalimat penting untuk traveling",
-                onTap: () {},
-              ),
-            ],
+          _buildMenuCard(
+            icon: Icons.map_rounded,
+            iconColor: Colors.orange,
+            title: "Language Centers",
+            subtitle: "Cari tempat kursus dan sertifikasi terdekat",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LanguageCenterPage(),
+                ),
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMenuSection({required String title, required List<Widget> items}) {
+  void _showLocationPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Pilih Jenis Tempat",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const Icon(Icons.school, color: Colors.orange),
+                title: const Text("Kursus Bahasa Inggris"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openMap("English Course near me");
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.assignment, color: Colors.blue),
+                title: const Text("Pusat Sertifikasi (TOEFL/IELTS)"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openMap("TOEFL IELTS Certification Center near me");
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMenuSection({
+    required String title,
+    required List<Widget> items,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, 
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey)),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+          ),
+        ),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
@@ -84,7 +157,7 @@ class TravelerPage extends StatelessWidget {
                 color: Colors.black.withOpacity(0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
-              )
+              ),
             ],
           ),
           child: Column(children: items),
