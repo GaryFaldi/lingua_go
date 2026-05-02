@@ -203,7 +203,7 @@ class _CurrencyPageState extends State<CurrencyPage> {
     ];
 
     return DropdownButtonFormField<String>(
-      value: isBase ? _baseCurrency : _targetCurrency,
+      initialValue: isBase ? _baseCurrency : _targetCurrency,
       // Gunakan isExpanded agar teks tidak terpotong jika layar kecil
       isExpanded: true,
       decoration: const InputDecoration(
