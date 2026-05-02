@@ -316,12 +316,134 @@ class _TiltAWordPageState extends State<TiltAWordPage>
     _timer?.cancel();
     _gameLoop?.cancel();
 
-    final quest = context.read<QuestProvider>();
+    if (!mounted) return;
+
+    setState(() => _gameOver = true);
+
     final xp = _score ~/ 5;
-    await quest.addXp(xp);
+
+    // Simpan XP ke DB
+    try {
+      final quest = context.read<QuestProvider>();
+      await quest.addXp(xp);
+      debugPrint('TiltAWord addXp: $xp');
+    } catch (e) {
+      debugPrint('TiltAWord _endGame error: $e');
+    }
 
     if (!mounted) return;
-    setState(() => _gameOver = true);
+
+    // Tampilkan popup hasil
+    _showGameOverDialog(xp);
+  }
+
+  void _showGameOverDialog(int xp) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: const Color(0xFF1A1040),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _score >= 100
+                    ? '🏆'
+                    : _score >= 50
+                    ? '🥈'
+                    : '💀',
+                style: const TextStyle(fontSize: 64),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'GAME OVER',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Column(
+                  children: [
+                    _DialogStatRow(
+                      label: 'Skor',
+                      value: '$_score',
+                      color: Colors.amber,
+                    ),
+                    const SizedBox(height: 8),
+                    _DialogStatRow(
+                      label: 'Ronde',
+                      value: '${_round - 1}',
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(height: 8),
+                    _DialogStatRow(
+                      label: 'XP Didapat',
+                      value: '+$xp XP',
+                      color: Colors.green,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context); // tutup dialog
+                    _startGame(); // main lagi
+                  },
+                  icon: const Icon(Icons.replay),
+                  label: const Text('Main Lagi'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEC4899),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context); // tutup dialog
+                    Navigator.pop(context); // kembali ke home
+                  },
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  label: const Text(
+                    'Kembali',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white30),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _pauseGame() {
@@ -827,19 +949,19 @@ class _TiltAWordPageState extends State<TiltAWordPage>
               ),
               child: Column(
                 children: [
-                  _StatRow(
+                  _DialogStatRow(
                     label: 'Skor',
                     value: '$_score',
                     color: Colors.amber,
                   ),
                   const SizedBox(height: 8),
-                  _StatRow(
+                  _DialogStatRow(
                     label: 'Ronde',
                     value: '${_round - 1}',
                     color: Colors.blue,
                   ),
                   const SizedBox(height: 8),
-                  _StatRow(
+                  _DialogStatRow(
                     label: 'XP Didapat',
                     value: '+$xp XP',
                     color: Colors.green,
@@ -929,11 +1051,11 @@ class _HowToRow extends StatelessWidget {
   }
 }
 
-class _StatRow extends StatelessWidget {
+class _DialogStatRow extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _StatRow({
+  const _DialogStatRow({
     required this.label,
     required this.value,
     required this.color,
