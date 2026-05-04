@@ -23,8 +23,10 @@ class NotificationService {
         >()
         ?.requestNotificationsPermission();
     if (Platform.isAndroid) {
-      final androidPlugin = _notificationsPlugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       await androidPlugin?.requestExactAlarmsPermission();
     }
   }
@@ -59,12 +61,30 @@ class NotificationService {
       now.year,
       now.month,
       now.day,
-      7,
-    ); // Jam 7 pagi
+      12,
+      02,
+    );
 
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
     return scheduledDate;
+  }
+
+  static Future<void> showTestNotification() async {
+    await _notificationsPlugin.show(
+      99,
+      'Lingua-Go: Tantangan Hari Ini!',
+      'Yuk selesaikan Daily Challenge kamu dan dapatkan +50 XP! 🔥',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'daily_reminders',
+          'Daily Reminders',
+          channelDescription: 'Notifikasi pengingat tantangan harian',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
+    );
   }
 }

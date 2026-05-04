@@ -79,4 +79,34 @@ class ProfileRepository {
 
     return HashHelper.verifyPassword(password, salt, currentHash);
   }
+
+  Future<Map<String, dynamic>?> getSuggestion(int userId) async {
+    final db = await _dbHelper.database;
+    final results = await db.query(
+      'suggestions',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'created_at DESC',
+      limit: 1,
+    );
+    return results.isEmpty ? null : results.first;
+  }
+
+  Future<void> updateSuggestion({
+    required int userId,
+    required String kesan,
+    required String saran,
+  }) async {
+    final db = await _dbHelper.database;
+    await db.update(
+      'suggestions',
+      {
+        'kesan': kesan,
+        'saran': saran,
+        'created_at': DateTime.now().toIso8601String(),
+      },
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
+  }
 }
