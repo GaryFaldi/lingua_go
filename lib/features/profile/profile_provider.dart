@@ -19,12 +19,15 @@ class ProfileProvider extends ChangeNotifier {
 
   String _biometricKey(int userId) => 'biometric_enabled_$userId';
   String _photoKey(int userId) => 'photo_path_$userId';
+  Map<String, dynamic>? _existingSuggestion;
+  Map<String, dynamic>? get existingSuggestion => _existingSuggestion;
+  bool get hasSuggestion => _existingSuggestion != null;
 
   Future<void> loadPrefs(int userId) async {
-    // ✅ Terima userId
     final prefs = await SharedPreferences.getInstance();
     _biometricEnabled = prefs.getBool(_biometricKey(userId)) ?? false;
     _photoPath = prefs.getString(_photoKey(userId));
+    await loadSuggestion(userId); // ← tambah ini
     notifyListeners();
   }
 
@@ -82,11 +85,23 @@ class ProfileProvider extends ChangeNotifier {
     );
   }
 
+  // Update saveSuggestion — kalau sudah ada, update; kalau belum, insert
   Future<void> saveSuggestion({
     required int userId,
     required String kesan,
     required String saran,
   }) async {
-    await _repo.saveSuggestion(userId: userId, kesan: kesan, saran: saran);
+    if (_existingSuggestion != null) {
+      await _repo.updateSuggestion(userId: userId, kesan: kesan, saran: saran);
+    } else {
+      await _repo.saveSuggestion(userId: userId, kesan: kesan, saran: saran);
+    }
+    _existingSuggestion = {'kesan': kesan, 'saran': saran};
+    notifyListeners();
+  }
+
+  Future<void> loadSuggestion(int userId) async {
+    _existingSuggestion = await _repo.getSuggestion(userId);
+    notifyListeners();
   }
 }

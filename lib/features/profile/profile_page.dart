@@ -7,6 +7,7 @@ import '../auth/auth_provider.dart';
 import 'profile_provider.dart';
 import '../home/main_quest/quest_provider.dart';
 import '../home/side_quest/word_bank_page.dart';
+import '../../core/services/notification_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -172,8 +173,12 @@ class _ProfilePageState extends State<ProfilePage> {
   // ── Kesan & Saran ─────────────────────────────────────────
   void _showSuggestionSheet() {
     final auth = context.read<AuthProvider>();
-    final kesanCtrl = TextEditingController();
-    final saranCtrl = TextEditingController();
+    final existing = _profileProvider.existingSuggestion;
+
+    // Pre-fill kalau sudah pernah isi
+    final kesanCtrl = TextEditingController(text: existing?['kesan'] ?? '');
+    final saranCtrl = TextEditingController(text: existing?['saran'] ?? '');
+    final bool isEdit = existing != null;
 
     showModalBottomSheet(
       context: context,
@@ -203,14 +208,63 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Kesan & Saran TPM',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Mata Kuliah Teknologi Pemrograman Mobile',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isEdit ? 'Edit Kesan & Saran' : 'Kesan & Saran TPM',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Mata Kuliah Teknologi Pemrograman Mobile',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Badge kalau sudah pernah isi
+                if (isEdit)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle_rounded,
+                          size: 12,
+                          color: Colors.green.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Sudah diisi',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 16),
             TextField(
@@ -262,14 +316,18 @@ class _ProfilePageState extends State<ProfilePage> {
                   if (mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Terima kasih atas feedbackmu!'),
+                      SnackBar(
+                        content: Text(
+                          isEdit
+                              ? 'Feedback berhasil diperbarui!'
+                              : 'Terima kasih atas feedbackmu!',
+                        ),
                         backgroundColor: Colors.green,
                       ),
                     );
                   }
                 },
-                child: const Text('Kirim Feedback'),
+                child: Text(isEdit ? 'Perbarui Feedback' : 'Kirim Feedback'),
               ),
             ),
           ],
@@ -556,12 +614,41 @@ class _ProfilePageState extends State<ProfilePage> {
                           icon: Icons.rate_review_rounded,
                           iconBg: const Color(0xFFD4537E),
                           title: 'Kesan & Saran',
-                          subtitle: 'Feedback matakuliah TPM',
+                          subtitle: profile.hasSuggestion
+                              ? 'Feedback sudah dikirim — tap untuk edit'
+                              : 'Feedback matakuliah TPM',
+                          trailing: profile.hasSuggestion
+                              ? const _Chip('✓ Edit')
+                              : const _Chip('Isi'),
                           onTap: _showSuggestionSheet,
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
+                    _SectionLabel('Developer'),
+                    _ProfileCard(
+                      children: [
+                        _ProfileRow(
+                          icon: Icons.notifications_active_rounded,
+                          iconBg: Colors.orange,
+                          title: 'Test Notifikasi',
+                          subtitle: 'Trigger notifikasi sekarang',
+                          trailing: const _Chip('Test'),
+                          onTap: () async {
+                            await NotificationService.showTestNotification();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Notifikasi dikirim!'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     OutlinedButton.icon(
                       onPressed: _confirmLogout,
                       icon: const Icon(

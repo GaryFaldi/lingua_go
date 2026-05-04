@@ -8,31 +8,25 @@ import 'features/auth/lock_screen.dart';
 import 'features/home/main_navigation.dart';
 import 'features/home/main_quest/quest_provider.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 import 'core/services/notification_service.dart';
 
 Future<void> main() async {
-  // 1. Wajib dipanggil pertama kali
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Jalankan inisialisasi secara paralel
-  // Kita hilangkan Future.run dan gunakan cara yang benar
+  tz.initializeTimeZones();
+  tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
+
   await Future.wait([
     dotenv.load(fileName: '.env'),
-    NotificationService.init().then((_) {
-      // Menjadwalkan notifikasi tanpa memblokir aplikasi
-      NotificationService.scheduleDailySevenAM().catchError((e) {
-        debugPrint("Gagal menjadwalkan notifikasi: $e");
-      });
-    }),
-    // tz.initializeTimeZones() adalah fungsi sinkron, 
-    // jadi kita bungkus dalam Future agar bisa masuk Future.wait
-    Future(() => tz.initializeTimeZones()),
+    NotificationService.init(),
   ]);
+  NotificationService.scheduleDailySevenAM().catchError((e) {
+    debugPrint("Gagal menjadwalkan notifikasi: $e");
+  });
 
   final authProvider = AuthProvider();
-  
-  // 3. Restore session tetap ditunggu (await) 
-  // karena ini menentukan halaman login atau home
+
   await authProvider.tryRestoreSession();
 
   runApp(MyApp(authProvider: authProvider));
