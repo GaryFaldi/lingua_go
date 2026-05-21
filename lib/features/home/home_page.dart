@@ -45,7 +45,12 @@ class HomePage extends StatelessWidget {
                 'Lihat Semua',
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => QuestListPage()),
+                  MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(
+                      value: context.read<QuestProvider>(),
+                      child: QuestListPage(),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -122,7 +127,12 @@ class HomePage extends StatelessWidget {
           icon: Icons.bookmark_outlined,
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const WordBankPage()),
+            MaterialPageRoute(
+              builder: (_) => ChangeNotifierProvider.value(
+                value: context.read<QuestProvider>(),
+                child: const WordBankPage(),
+              ),
+            ),
           ),
         ),
       ],
@@ -298,7 +308,10 @@ class HomePage extends StatelessWidget {
               ? () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => QuestDetailPage(level: level),
+                    builder: (_) => ChangeNotifierProvider.value(
+                      value: context.read<QuestProvider>(),
+                      child: QuestDetailPage(level: level),
+                    ),
                   ),
                 )
               : null,
@@ -533,7 +546,12 @@ class HomePage extends StatelessWidget {
         gradient: const [Color(0xFFF59E0B), Color(0xFFEF4444)],
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const WordBankPage()),
+          MaterialPageRoute(
+            builder: (_) => ChangeNotifierProvider.value(
+              value: context.read<QuestProvider>(),
+              child: const WordBankPage(),
+            ),
+          ),
         ),
       ),
     ];

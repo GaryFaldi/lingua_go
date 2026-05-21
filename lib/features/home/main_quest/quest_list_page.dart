@@ -31,7 +31,10 @@ class QuestListPage extends StatelessWidget {
                 ? () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => QuestDetailPage(level: level),
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: context.read<QuestProvider>(),
+                        child: QuestDetailPage(level: level),
+                      ),
                     ),
                   )
                 : () => ScaffoldMessenger.of(context).showSnackBar(

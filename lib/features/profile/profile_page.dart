@@ -600,7 +600,10 @@ class _ProfilePageState extends State<ProfilePage> {
                             // ✅ tambahkan ini
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const WordBankPage(),
+                              builder: (_) => ChangeNotifierProvider.value(
+                                value: context.read<QuestProvider>(),
+                                child: const WordBankPage(),
+                              ),
                             ),
                           ),
                         ),
