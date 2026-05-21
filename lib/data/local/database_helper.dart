@@ -18,7 +18,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final dbName = dotenv.env['DB_NAME'] ?? 'linguaquest.db';
-    final dbVersion = int.tryParse(dotenv.env['DB_VERSION'] ?? '3') ?? 3;
+    final dbVersion = int.tryParse(dotenv.env['DB_VERSION'] ?? '4') ?? 4;
     final dbPath = join(await getDatabasesPath(), dbName);
 
     return await openDatabase(

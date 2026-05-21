@@ -36,7 +36,7 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
   int _eggsOpened = 0;
   static const int _maxEggs = 3;
   int _totalXp = 0;
-  bool _isLoadingAttempts = true; // ← tambah
+  bool _isLoadingAttempts = true;
   bool _limitReached = false;
   bool _sessionDone = false;
 

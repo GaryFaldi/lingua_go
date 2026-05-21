@@ -47,33 +47,32 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-// Placeholder sementara untuk Home & Traveler
-class _PlaceholderPage extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  const _PlaceholderPage({required this.label, required this.icon});
+// class _PlaceholderPage extends StatelessWidget {
+//   final String label;
+//   final IconData icon;
+//   const _PlaceholderPage({required this.label, required this.icon});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 64, color: const Color(0xFF6C63FF)),
-            const SizedBox(height: 12),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Coming soon...',
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       body: Center(
+//         child: Column(
+//           mainAxisSize: MainAxisSize.min,
+//           children: [
+//             Icon(icon, size: 64, color: const Color(0xFF6C63FF)),
+//             const SizedBox(height: 12),
+//             Text(
+//               label,
+//               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+//             ),
+//             const SizedBox(height: 6),
+//             Text(
+//               'Coming soon...',
+//               style: TextStyle(color: Colors.grey.shade500),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }

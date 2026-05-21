@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/quest_model.dart';
+import 'spell_correction_model.dart';
 import 'quest_provider.dart';
 
 class QuestDetailPage extends StatefulWidget {
@@ -18,43 +19,20 @@ class _QuestDetailPageState extends State<QuestDetailPage> {
   String _feedback = '';
   bool _isCorrect = false;
   bool _answered = false;
+  bool _isTypo = false;
   int _correctCount = 0;
 
-  // ── ML Auto-Correction ────────────────────────────────
+  // ── ML Auto-Correction (Naive Bayes) ─────────────────────────
+  final _spellModel = NaiveBayesSpellModel();
 
-  // Hitung Levenshtein distance untuk spell checking
-  int _levenshtein(String s, String t) {
-    if (s == t) return 0;
-    if (s.isEmpty) return t.length;
-    if (t.isEmpty) return s.length;
-
-    final d = List.generate(
-      s.length + 1,
-      (i) => List.generate(t.length + 1, (j) => 0),
-    );
-
-    for (int i = 0; i <= s.length; i++) d[i][0] = i;
-    for (int j = 0; j <= t.length; j++) d[0][j] = j;
-
-    for (int i = 1; i <= s.length; i++) {
-      for (int j = 1; j <= t.length; j++) {
-        final cost = s[i - 1] == t[j - 1] ? 0 : 1;
-        d[i][j] = [
-          d[i - 1][j] + 1,
-          d[i][j - 1] + 1,
-          d[i - 1][j - 1] + cost,
-        ].reduce((a, b) => a < b ? a : b);
-      }
-    }
-    return d[s.length][t.length];
+  @override
+  void initState() {
+    super.initState();
+    _spellModel.loadModel(); // load JSON saat page dibuka
   }
 
-  // Cek jawaban dengan ML auto-correction
   String? _getSpellSuggestion(String input, String correct) {
-    final distance = _levenshtein(input.toLowerCase(), correct.toLowerCase());
-    // Jika jarak 1-2 karakter = typo, beri saran
-    if (distance > 0 && distance <= 2) return correct;
-    return null;
+    return _spellModel.predictCorrection(input, correct);
   }
 
   void _checkAnswer() {
@@ -66,21 +44,30 @@ class _QuestDetailPageState extends State<QuestDetailPage> {
     final userInput = input.toLowerCase();
 
     setState(() {
-      _answered = true;
       if (userInput == correct) {
+        // ✅ Benar
+        _answered = true;
         _isCorrect = true;
+        _isTypo = false;
         _feedback = '✅ Benar! Bagus sekali!';
         _correctCount++;
       } else {
-        _isCorrect = false;
         final suggestion = _getSpellSuggestion(userInput, vocab.word);
         if (suggestion != null) {
-          // ML: Deteksi typo dan beri saran
+          // 🤔 Typo — tetap answered, bisa lanjut
+          _answered = true;
+          _isCorrect = false;
+          _isTypo = true;
           _feedback =
               '🤔 Hampir benar! Maksud kamu "$suggestion"?\n'
               'Jawaban yang benar: ${vocab.word}';
         } else {
-          _feedback = '❌ Salah. Jawaban: ${vocab.word}';
+          // ❌ Salah — reset, harus jawab ulang
+          _answered = false;
+          _isCorrect = false;
+          _isTypo = false;
+          _feedback = '❌ Salah! Coba lagi.';
+          _answerCtrl.clear();
         }
       }
     });
@@ -94,6 +81,7 @@ class _QuestDetailPageState extends State<QuestDetailPage> {
         _feedback = '';
         _answered = false;
         _isCorrect = false;
+        _isTypo = false; // tambah ini
       });
     } else {
       _showCompletionDialog();
@@ -434,21 +422,18 @@ class _QuestDetailPageState extends State<QuestDetailPage> {
                 child: ElevatedButton.icon(
                   onPressed: _nextVocab,
                   icon: Icon(
-                    // Tambahkan operator < (lebih kecil dari)
                     _currentIndex < widget.level.vocabs.length - 1
                         ? Icons.arrow_forward
                         : Icons.emoji_events,
                   ),
                   label: Text(
-                    // Tambahkan operator < (lebih kecil dari)
                     _currentIndex < widget.level.vocabs.length - 1
                         ? 'Kata Berikutnya'
                         : 'Selesai! 🎉',
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isCorrect
-                        ? Colors.green
-                        : AppTheme.primaryBlue,
+                    // Benar = hijau, Typo = orange, (Salah tidak sampai sini)
+                    backgroundColor: _isCorrect ? Colors.green : Colors.orange,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
