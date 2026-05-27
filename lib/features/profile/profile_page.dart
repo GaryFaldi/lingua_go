@@ -370,7 +370,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
-    final quest = context.watch<QuestProvider>(); // ✅ tambahkan ini
+    final quest = context.watch<QuestProvider>();
     final xpProgress = quest.currentXp % 1000;
 
     return ChangeNotifierProvider.value(
@@ -449,7 +449,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Level ${quest.currentLevel} — ${quest.rankTitle}', // ✅ pakai quest
+                                  'Level ${quest.currentLevel} — ${quest.rankTitle}',
                                   style: const TextStyle(
                                     fontSize: 13,
                                     color: Colors.white70,
@@ -472,7 +472,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ),
                           Text(
-                            '$xpProgress / 1000', // xpProgress sudah pakai quest di atas
+                            '$xpProgress / 1000',
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.white70,
