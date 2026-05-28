@@ -1,27 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 class LanguageCenterPage extends StatelessWidget {
   const LanguageCenterPage({super.key});
 
-  Future<void> _openMap(String query) async {
-    final String geoUrl = "geo:0,0?q=${Uri.encodeComponent(query)}";
-    final String webUrl =
-        "https://www.google.com/maps/search/${Uri.encodeComponent(query)}";
-
-    try {
-      final Uri geoUri = Uri.parse(geoUrl);
-      if (await canLaunchUrl(geoUri)) {
-        await launchUrl(geoUri, mode: LaunchMode.externalNonBrowserApplication);
-      } else {
-        final Uri webUri = Uri.parse(webUrl);
-        if (await canLaunchUrl(webUri)) {
-          await launchUrl(webUri, mode: LaunchMode.externalApplication);
-        }
-      }
-    } catch (e) {
-      debugPrint("Gagal membuka Maps: $e");
-    }
+  void _openMap(BuildContext context, String query, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => InAppMapPage(query: query, title: title),
+      ),
+    );
   }
 
   @override
@@ -36,6 +25,7 @@ class LanguageCenterPage extends StatelessWidget {
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
+        foregroundColor: Colors.black, // Memastikan ikon back berwarna hitam
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -51,7 +41,11 @@ class LanguageCenterPage extends StatelessWidget {
             title: "Kursus Bahasa Inggris",
             description:
                 "Cari bimbingan belajar atau kursus intensif terdekat.",
-            onTap: () => _openMap("English Course near me"),
+            onTap: () => _openMap(
+              context,
+              "English Course near me",
+              "Kursus Bahasa Inggris",
+            ),
           ),
           const SizedBox(height: 15),
           _buildLocationCard(
@@ -59,7 +53,11 @@ class LanguageCenterPage extends StatelessWidget {
             color: Colors.blue,
             title: "Pusat Sertifikasi",
             description: "Lokasi ujian resmi untuk TOEFL, IELTS, atau TOEIC.",
-            onTap: () => _openMap("TOEFL IELTS Certification Center near me"),
+            onTap: () => _openMap(
+              context,
+              "TOEFL IELTS Certification Center near me",
+              "Pusat Sertifikasi",
+            ),
           ),
         ],
       ),
@@ -118,6 +116,71 @@ class LanguageCenterPage extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// Halaman baru untuk menampilkan Peta di dalam aplikasi
+class InAppMapPage extends StatefulWidget {
+  final String query;
+  final String title;
+
+  const InAppMapPage({super.key, required this.query, required this.title});
+
+  @override
+  State<InAppMapPage> createState() => _InAppMapPageState();
+}
+
+class _InAppMapPageState extends State<InAppMapPage> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Format URL pencarian Google Maps
+    final String searchUrl =
+        "https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.query)}";
+
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            if (request.url.startsWith('intent://') ||
+                request.url.startsWith('android-app://') ||
+                request.url.startsWith('geo:')) {
+              debugPrint('Blokir redirect ke aplikasi native: ${request.url}');
+              return NavigationDecision.prevent; // Paksa tetap di web
+            }
+            return NavigationDecision.navigate;
+          },
+          onPageFinished: (String url) {
+            setState(() {
+              _isLoading = false; // Hilangkan loading saat peta selesai dimuat
+            });
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(searchUrl));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title, style: const TextStyle(fontSize: 16)),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 1,
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_isLoading) const Center(child: CircularProgressIndicator()),
+        ],
       ),
     );
   }
