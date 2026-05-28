@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_provider.dart';
 import 'main_quest/quest_provider.dart';
@@ -10,6 +11,7 @@ import 'side_quest/crack_the_egg_page.dart';
 import 'side_quest/word_bank_page.dart';
 import 'dictionary/dictionary_page.dart';
 import 'chatbot/chatbot_page.dart';
+import '../../controller/word_bank_controller.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -503,68 +505,73 @@ class HomePage extends StatelessWidget {
   // ── Side Quest Grid ─────────────────────────────────────
 
   Widget _buildSideQuestGrid(BuildContext context) {
-    final items = [
-      _SideQuestItem(
-        icon: '📱',
-        title: 'Tilt-A-Word',
-        subtitle: 'Gyroscope Game',
-        gradient: const [Color(0xFFEC4899), Color(0xFFF97316)],
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const TiltAWordPage()),
-        ),
-      ),
-      _SideQuestItem(
-        icon: '🎲',
-        title: 'Crack the Egg',
-        subtitle: 'Kuis Kilat Harian',
-        gradient: const [Color(0xFF10B981), Color(0xFF06B6D4)],
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => CrackTheEggPage(
-              questProvider: context.read<QuestProvider>(),
-              userId: context.read<QuestProvider>().userId, // ← tambah ini
-            ),
-          ),
-        ),
-      ),
-      _SideQuestItem(
-        icon: '📖',
-        title: 'Kamus',
-        subtitle: 'Cari Kata',
-        gradient: const [Color(0xFF3B82F6), Color(0xFF6366F1)],
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const DictionaryPage()),
-        ),
-      ),
-      _SideQuestItem(
-        icon: '⭐',
-        title: 'Word Bank',
-        subtitle: 'Koleksi Vocab',
-        gradient: const [Color(0xFFF59E0B), Color(0xFFEF4444)],
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChangeNotifierProvider.value(
-              value: context.read<QuestProvider>(),
-              child: const WordBankPage(),
-            ),
-          ),
-        ),
-      ),
-    ];
+    // 1. Inisialisasi controller GetX untuk Word Bank
+    final wordBankCtrl = Get.put(WordBankController());
 
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.6,
-      children: items.map((item) => _buildSideQuestCard(item)).toList(),
-    );
+    // 2. Bungkus GridView dengan Obx agar UI bereaksi terhadap perubahan data
+    return Obx(() {
+      final wordCount = wordBankCtrl.words.length; // Ambil jumlah kata
+
+      final items = [
+        _SideQuestItem(
+          icon: '📱',
+          title: 'Tilt-A-Word',
+          subtitle: 'Gyroscope Game',
+          gradient: const [Color(0xFFEC4899), Color(0xFFF97316)],
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TiltAWordPage()),
+          ),
+        ),
+        _SideQuestItem(
+          icon: '🎲',
+          title: 'Crack the Egg',
+          subtitle: 'Kuis Kilat Harian',
+          gradient: const [Color(0xFF10B981), Color(0xFF06B6D4)],
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CrackTheEggPage(
+                questProvider: context.read<QuestProvider>(),
+                userId: context.read<QuestProvider>().userId,
+              ),
+            ),
+          ),
+        ),
+        _SideQuestItem(
+          icon: '📖',
+          title: 'Kamus',
+          subtitle: 'Cari Kata',
+          gradient: const [Color(0xFF3B82F6), Color(0xFF6366F1)],
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DictionaryPage()),
+          ),
+        ),
+        _SideQuestItem(
+          icon: '⭐',
+          title: 'Word Bank',
+          // 3. Masukkan variabel wordCount di sini
+          subtitle: '$wordCount Kosakata Tersimpan',
+          gradient: const [Color(0xFFF59E0B), Color(0xFFEF4444)],
+          onTap: () => Navigator.push(
+            context,
+            // 4. Hapus ChangeNotifierProvider karena kita sudah pakai GetX
+            MaterialPageRoute(builder: (_) => const WordBankPage()),
+          ),
+        ),
+      ];
+
+      return GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.6,
+        children: items.map((item) => _buildSideQuestCard(item)).toList(),
+      );
+    });
   }
 
   Widget _buildSideQuestCard(_SideQuestItem item) {

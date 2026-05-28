@@ -3,6 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'time_conversion.dart';
 import 'currency_page.dart';
 import 'language_center_page.dart';
+import 'english_course_page.dart';
+import 'certification_center_page.dart';
 
 class TravelerPage extends StatelessWidget {
   const TravelerPage({super.key});
@@ -72,19 +74,33 @@ class TravelerPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          _buildMenuCard(
-            icon: Icons.map_rounded,
-            iconColor: Colors.orange,
+          _buildMenuSection(
             title: "Language Centers",
-            subtitle: "Cari tempat kursus dan sertifikasi terdekat",
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LanguageCenterPage(),
+            items: [
+              _buildMenuCard(
+                icon: Icons.school_rounded,
+                iconColor: Colors.orange,
+                title: "Kursus Bahasa Inggris",
+                subtitle:
+                    "Cari bimbingan belajar atau kursus intensif terdekat",
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EnglishCoursePage()),
                 ),
-              );
-            },
+              ),
+              _buildMenuCard(
+                icon: Icons.assignment_turned_in_rounded,
+                iconColor: Colors.blue,
+                title: "Pusat Sertifikasi",
+                subtitle: "Lokasi ujian resmi untuk TOEFL, IELTS, atau TOEIC",
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CertificationCenterPage(),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
