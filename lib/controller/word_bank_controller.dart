@@ -1,22 +1,16 @@
 import 'package:get/get.dart';
 import '../data/models/vocab_model.dart';
+import '../data/models/quest_model.dart';
 
 class WordBankController extends GetxController {
-  // Gunakan .obs agar list ini menjadi reaktif (observable)
-  var words = <Vocab>[
-    Vocab(word: 'Dragoon', meaning: 'Seorang prajurit kuda; kavaleri.'),
-    Vocab(word: 'Please', meaning: 'Tolong / Mohon'),
-    Vocab(word: 'Bread', meaning: 'Roti'),
-  ].obs;
+  var words = <Vocab>[].obs;
 
-  // Fungsi untuk menghapus kata
   void removeFromWordBank(String word) {
     words.removeWhere((v) => v.word == word);
-    // TODO: Tambahkan logika untuk menghapus dari SQLite di sini nantinya
   }
 
-  // Fungsi untuk menambah kata
-  void addToWordBank(Vocab vocab) {
+  void addToWordBank(VocabItem item) {
+    final vocab = Vocab(word: item.word, meaning: item.meaning);
     words.add(vocab);
   }
 }

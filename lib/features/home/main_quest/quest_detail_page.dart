@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:get/get.dart';
+import '../../../controller/word_bank_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/quest_model.dart';
 import 'spell_correction_model.dart';
@@ -163,7 +165,7 @@ class _QuestDetailPageState extends State<QuestDetailPage> {
   Widget build(BuildContext context) {
     final vocab = widget.level.vocabs[_currentIndex];
     final quest = context.watch<QuestProvider>();
-    final isInBank = quest.isInWordBank(vocab.word);
+    final wordBankCtrl = Get.find<WordBankController>();
     final total = widget.level.vocabs.length;
     final progress = (_currentIndex + 1) / total;
 
@@ -175,30 +177,35 @@ class _QuestDetailPageState extends State<QuestDetailPage> {
         elevation: 0,
         actions: [
           // Tombol tambah ke Word Bank
-          IconButton(
-            onPressed: () {
-              if (isInBank) {
-                quest.removeFromWordBank(vocab.word);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('"${vocab.word}" dihapus dari Word Bank'),
-                  ),
-                );
-              } else {
-                quest.addToWordBank(vocab);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('"${vocab.word}" ditambahkan ke Word Bank ⭐'),
-                  ),
-                );
-              }
-            },
-            icon: Icon(
-              isInBank ? Icons.bookmark : Icons.bookmark_border,
-              color: isInBank ? Colors.amber : Colors.grey,
-            ),
-            tooltip: 'Simpan ke Word Bank',
-          ),
+          Obx(() {
+            final inBank = wordBankCtrl.words.any((v) => v.word == vocab.word);
+            return IconButton(
+              onPressed: () {
+                if (inBank) {
+                  wordBankCtrl.removeFromWordBank(vocab.word);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('"${vocab.word}" dihapus dari Word Bank'),
+                    ),
+                  );
+                } else {
+                  wordBankCtrl.addToWordBank(vocab);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        '"${vocab.word}" ditambahkan ke Word Bank ⭐',
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: Icon(
+                inBank ? Icons.bookmark : Icons.bookmark_border,
+                color: inBank ? Colors.amber : Colors.grey,
+              ),
+              tooltip: 'Simpan ke Word Bank',
+            );
+          }),
         ],
       ),
       body: Padding(

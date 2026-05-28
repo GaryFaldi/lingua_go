@@ -9,13 +9,12 @@ class WordBankPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Inisialisasi controller GetX
-    final controller = Get.put(WordBankController());
+    final controller = Get.find<WordBankController>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4FF),
       appBar: AppBar(
-        // Obx akan memantau perubahan jumlah array words
-        title: Obx(() => Text('Word Bank ⭐')),
+        title: const Text('Word Bank ⭐'),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),

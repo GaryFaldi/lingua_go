@@ -1,14 +1,15 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import 'package:get/get.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'controller/word_bank_controller.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/login_page.dart';
 import 'features/auth/lock_screen.dart';
 import 'features/home/main_navigation.dart';
 import 'features/home/main_quest/quest_provider.dart';
-import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
 import 'core/services/notification_service.dart';
 
 Future<void> main() async {
@@ -28,6 +29,8 @@ Future<void> main() async {
   final authProvider = AuthProvider();
 
   await authProvider.tryRestoreSession();
+
+  Get.put(WordBankController());
 
   runApp(MyApp(authProvider: authProvider));
 }
