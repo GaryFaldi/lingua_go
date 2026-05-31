@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class CurrencyService {
-  // Menggunakan API Frankfurter (Gratis & No API Key)
   static const String _baseUrl = "https://api.frankfurter.app/latest";
 
   Future<Map<String, dynamic>> getLatestRates(String base) async {

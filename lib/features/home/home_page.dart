@@ -505,13 +505,13 @@ class HomePage extends StatelessWidget {
   // ── Side Quest Grid ─────────────────────────────────────
 
   Widget _buildSideQuestGrid(BuildContext context) {
-    // 1. Inisialisasi controller GetX untuk Word Bank
     final wordBankCtrl = Get.put(WordBankController());
+    final userId = context.read<QuestProvider>().userId;
 
-    // 2. Bungkus GridView dengan Obx agar UI bereaksi terhadap perubahan data
+    wordBankCtrl.loadWords(userId);
+
     return Obx(() {
-      final wordCount = wordBankCtrl.words.length; // Ambil jumlah kata
-
+      final wordCount = wordBankCtrl.words.length;
       final items = [
         _SideQuestItem(
           icon: '📱',
@@ -551,12 +551,10 @@ class HomePage extends StatelessWidget {
         _SideQuestItem(
           icon: '⭐',
           title: 'Word Bank',
-          // 3. Masukkan variabel wordCount di sini
           subtitle: '$wordCount Kosakata Tersimpan',
           gradient: const [Color(0xFFF59E0B), Color(0xFFEF4444)],
           onTap: () => Navigator.push(
             context,
-            // 4. Hapus ChangeNotifierProvider karena kita sudah pakai GetX
             MaterialPageRoute(builder: (_) => const WordBankPage()),
           ),
         ),

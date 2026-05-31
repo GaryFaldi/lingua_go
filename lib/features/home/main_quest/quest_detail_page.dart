@@ -176,20 +176,19 @@ class _QuestDetailPageState extends State<QuestDetailPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // Tombol tambah ke Word Bank
           Obx(() {
             final inBank = wordBankCtrl.words.any((v) => v.word == vocab.word);
             return IconButton(
-              onPressed: () {
+              onPressed: () async {
                 if (inBank) {
-                  wordBankCtrl.removeFromWordBank(vocab.word);
+                  await wordBankCtrl.removeFromWordBank(vocab.word);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('"${vocab.word}" dihapus dari Word Bank'),
                     ),
                   );
                 } else {
-                  wordBankCtrl.addToWordBank(vocab);
+                  await wordBankCtrl.addToWordBank(vocab);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(

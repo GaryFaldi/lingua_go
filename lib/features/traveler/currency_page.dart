@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
-import 'currency_service.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'currency_service.dart';
 
 class CurrencyPage extends StatefulWidget {
   const CurrencyPage({super.key});
@@ -13,43 +11,26 @@ class CurrencyPage extends StatefulWidget {
 }
 
 class _CurrencyPageState extends State<CurrencyPage> {
-  final _amountController = TextEditingController(text: "1");
+  final _amountController = TextEditingController();
+
   String _baseCurrency = "IDR";
   String _targetCurrency = "USD";
+
+  // Default result dimulai dari 0 sebelum API selesai load
   double _result = 0;
   bool _isLoading = true;
+
+  // Menyimpan rates hasil fetch dari API (misal: {"USD": 0.000063, "JPY": 0.0094})
   Map<String, dynamic> _rates = {};
 
   @override
   void initState() {
     super.initState();
-    _initLBSAndData();
+    _fetchNewRates();
   }
 
-  // LBS: Deteksi Negara & Set Mata Uang Otomatis
-  Future<void> _initLBSAndData() async {
-    try {
-      Position position = await Geolocator.getCurrentPosition();
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        String? countryCode = placemarks.first.isoCountryCode; // Misal: "ID"
-        setState(() {
-          if (countryCode == "ID") _baseCurrency = "IDR";
-          if (countryCode == "JP") _baseCurrency = "JPY";
-          // Tambahkan logika negara lain jika perlu
-        });
-      }
-    } catch (e) {
-      debugPrint("LBS Error: $e");
-    } finally {
-      _fetchNewRates();
-    }
-  }
-
+  /// Ambil rates terbaru dari API berdasarkan [_baseCurrency] yang aktif.
+  /// Dipanggil saat halaman pertama dibuka atau base currency berubah.
   Future<void> _fetchNewRates() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
@@ -61,31 +42,37 @@ class _CurrencyPageState extends State<CurrencyPage> {
         setState(() {
           _rates = data;
           _isLoading = false;
-          // Debugging: Print untuk melihat apakah data masuk ke HP kamu
-          debugPrint("Rates loaded for $_baseCurrency: $_rates");
-          _calculate();
+          _calculate(); // Hitung ulang begitu rates baru tersedia
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        debugPrint("Error fetching rates: $e");
       }
     }
   }
 
+  /// Hitung konversi dari input amount × rate target currency.
+  /// Dipanggil otomatis setiap kali amount atau target currency berubah.
   void _calculate() {
-    if (_rates.isNotEmpty && _rates.containsKey(_targetCurrency)) {
-      // Hapus titik agar bisa dibaca sebagai angka oleh Dart
-      String cleanValue = _amountController.text.replaceAll('.', '');
-      double amount = double.tryParse(cleanValue) ?? 0;
+    // Bersihkan separator titik ribuan sebelum di-parse
+    final cleanValue = _amountController.text.replaceAll('.', '');
+    final double amount = double.tryParse(cleanValue) ?? 0;
 
-      double rate = (_rates[_targetCurrency] as num).toDouble();
-
-      setState(() {
-        _result = amount * rate;
-      });
+    // Jika base dan target sama, hasil = amount itu sendiri
+    if (_baseCurrency == _targetCurrency) {
+      setState(() => _result = amount);
+      return;
     }
+
+    // Jika rates belum ada (API belum selesai), reset ke 0
+    if (_rates.isEmpty || !_rates.containsKey(_targetCurrency)) {
+      setState(() => _result = 0);
+      return;
+    }
+
+    final double rate = (_rates[_targetCurrency] as num).toDouble();
+    setState(() => _result = amount * rate);
   }
 
   @override
@@ -100,6 +87,8 @@ class _CurrencyPageState extends State<CurrencyPage> {
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
+                  // Input jumlah uang — pakai ThousandSeparatorFormatter
+                  // supaya otomatis tampil format ribuan (misal: 1.000.000)
                   TextField(
                     controller: _amountController,
                     keyboardType: TextInputType.number,
@@ -109,30 +98,38 @@ class _CurrencyPageState extends State<CurrencyPage> {
                     ],
                     decoration: const InputDecoration(
                       labelText: "Amount",
-                      hintText: "Contoh: 1.000",
+                      hintText: "Example: 1.000",
                     ),
-                    onChanged: (value) => _calculate(),
+                    // Hitung ulang setiap kali nilai input berubah
+                    onChanged: (_) => _calculate(),
                   ),
                   const SizedBox(height: 20),
 
-                  // Dropdown Row
+                  // Row dropdown: [Base Currency] → [Target Currency]
                   Row(
                     children: [
-                      Expanded(child: _buildCurrencyDropdown(true)),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10),
-                        child: Icon(
-                          Icons.arrow_forward_rounded,
-                          color: Colors.grey,
-                        ),
+                      Expanded(child: _buildCurrencyDropdown(isBase: true)),
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            // Tukar posisi base dan target currency
+                            final temp = _baseCurrency;
+                            _baseCurrency = _targetCurrency;
+                            _targetCurrency = temp;
+                          });
+                          // Fetch ulang karena base currency berubah
+                          _fetchNewRates();
+                        },
+                        icon: const Icon(Icons.swap_horiz_rounded),
+                        tooltip: "Swap currency",
                       ),
-                      Expanded(child: _buildCurrencyDropdown(false)),
+                      Expanded(child: _buildCurrencyDropdown(isBase: false)),
                     ],
                   ),
 
                   const SizedBox(height: 40),
 
-                  // Result Card (Sesuai Tema Biru-Ungu)
+                  // Tampilan hasil konversi dengan gradient
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
@@ -150,12 +147,14 @@ class _CurrencyPageState extends State<CurrencyPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          "${NumberFormat("#,###", "pt_BR").format(_result).replaceAll(',', '.')} $_targetCurrency",
+                          // Format angka dengan separator lokal Indonesia (titik ribuan)
+                          "${NumberFormat("#,##0.00", "id_ID").format(_result)} $_targetCurrency",
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
                           ),
+                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),
@@ -166,9 +165,10 @@ class _CurrencyPageState extends State<CurrencyPage> {
     );
   }
 
-  Widget _buildCurrencyDropdown(bool isBase) {
-    // Daftar lengkap mata uang yang didukung API Frankfurter
-    List<String> items = [
+  /// Builder untuk dropdown pilihan mata uang.
+  /// [isBase] = true → dropdown base currency, false → dropdown target currency.
+  Widget _buildCurrencyDropdown({required bool isBase}) {
+    const List<String> currencies = [
       "AUD",
       "BGN",
       "BRL",
@@ -203,13 +203,12 @@ class _CurrencyPageState extends State<CurrencyPage> {
     ];
 
     return DropdownButtonFormField<String>(
-      initialValue: isBase ? _baseCurrency : _targetCurrency,
-      // Gunakan isExpanded agar teks tidak terpotong jika layar kecil
+      value: isBase ? _baseCurrency : _targetCurrency,
       isExpanded: true,
       decoration: const InputDecoration(
         contentPadding: EdgeInsets.symmetric(horizontal: 12),
       ),
-      items: items
+      items: currencies
           .map(
             (e) => DropdownMenuItem(
               value: e,
@@ -218,13 +217,16 @@ class _CurrencyPageState extends State<CurrencyPage> {
           )
           .toList(),
       onChanged: (val) {
+        if (val == null) return;
         setState(() {
           if (isBase) {
-            _baseCurrency = val!;
+            _baseCurrency = val;
           } else {
-            _targetCurrency = val!;
+            _targetCurrency = val;
           }
         });
+        // Ganti base → harus fetch ulang karena rates berubah total
+        // Ganti target → cukup hitung ulang dari rates yang sudah ada
         if (isBase) {
           _fetchNewRates();
         } else {
@@ -235,30 +237,30 @@ class _CurrencyPageState extends State<CurrencyPage> {
   }
 }
 
+/// Custom formatter yang menambahkan titik sebagai pemisah ribuan.
+/// Contoh: "1000000" → "1.000.000"
 class ThousandSeparatorFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    if (newValue.text.isEmpty) {
-      return newValue.copyWith(text: '');
-    }
+    if (newValue.text.isEmpty) return newValue.copyWith(text: '');
 
-    // Hapus semua karakter selain angka
-    String cleanedText = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    // Hapus semua karakter non-angka sebelum diformat ulang
+    final cleanedText = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanedText.isEmpty) return newValue.copyWith(text: '');
 
-    // Format angka menggunakan NumberFormat dari package intl
-    final formatter = NumberFormat(
+    // Format dengan locale pt_BR (koma = ribuan), lalu ganti koma → titik
+    // supaya sesuai konvensi Indonesia (1.000.000)
+    final formatted = NumberFormat(
       "#,###",
       "pt_BR",
-    ); // pt_BR menggunakan titik (.)
-    double value = double.parse(cleanedText);
-    String formattedText = formatter.format(value).replaceAll(',', '.');
+    ).format(double.parse(cleanedText)).replaceAll(',', '.');
 
     return TextEditingValue(
-      text: formattedText,
-      selection: TextSelection.collapsed(offset: formattedText.length),
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

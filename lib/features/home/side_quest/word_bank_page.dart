@@ -1,16 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart'; // Wajib di-import untuk GetX!
+import 'package:get/get.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../controller/word_bank_controller.dart';
+import '../main_quest/quest_provider.dart';
 
-class WordBankPage extends StatelessWidget {
+class WordBankPage extends StatefulWidget {
   const WordBankPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Inisialisasi controller GetX
-    final controller = Get.find<WordBankController>();
+  State<WordBankPage> createState() => _WordBankPageState();
+}
 
+class _WordBankPageState extends State<WordBankPage> {
+  final controller = Get.find<WordBankController>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = context.read<QuestProvider>().userId;
+      controller.loadWords(userId);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4FF),
       appBar: AppBar(
@@ -21,7 +36,6 @@ class WordBankPage extends StatelessWidget {
       body: Obx(() {
         final words = controller.words;
 
-        // Jika kosong, tampilkan pesan kosong
         if (words.isEmpty) {
           return const Center(
             child: Column(
@@ -44,7 +58,6 @@ class WordBankPage extends StatelessWidget {
           );
         }
 
-        // Jika ada isinya, tampilkan list
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: words.length,
@@ -101,10 +114,8 @@ class WordBankPage extends StatelessWidget {
                   ),
                   IconButton(
                     onPressed: () {
-                      // Hapus dari state
                       controller.removeFromWordBank(vocab.word);
 
-                      // Munculkan notifikasi snackbar
                       Get.snackbar(
                         'Dihapus',
                         '"${vocab.word}" telah dihapus',
