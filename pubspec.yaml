@@ -54,6 +54,8 @@ dependencies:
   flutter_local_notifications: ^17.1.2
 
   url_launcher: ^6.3.0
+  get: ^4.7.3
+  webview_flutter: ^4.13.1
 
 flutter:
   uses-material-design: true

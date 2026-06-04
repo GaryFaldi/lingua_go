@@ -42,7 +42,6 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: authProvider),
 
-        // QuestProvider otomatis dibuat ulang saat user login/ganti akun
         ChangeNotifierProxyProvider<AuthProvider, QuestProvider?>(
           create: (_) => null,
           update: (_, auth, previous) {

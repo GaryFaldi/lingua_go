@@ -18,6 +18,8 @@ class _CurrencyPageState extends State<CurrencyPage> {
   String _targetCurrency = "USD";
   double _result = 0;
   bool _isLoading = true;
+  bool _hasConverted =
+      false; // Untuk tampilkan hasil hanya setelah tombol ditekan
   Map<String, dynamic> _rates = {};
 
   @override
@@ -26,22 +28,38 @@ class _CurrencyPageState extends State<CurrencyPage> {
     _initLBSAndData();
   }
 
-  // LBS: Deteksi Negara & Set Mata Uang Otomatis
   Future<void> _initLBSAndData() async {
     try {
-      Position position = await Geolocator.getCurrentPosition();
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
 
-      if (placemarks.isNotEmpty) {
-        String? countryCode = placemarks.first.isoCountryCode; // Misal: "ID"
-        setState(() {
-          if (countryCode == "ID") _baseCurrency = "IDR";
-          if (countryCode == "JP") _baseCurrency = "JPY";
-          // Tambahkan logika negara lain jika perlu
-        });
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.low, // Lebih cepat
+        );
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+
+        if (placemarks.isNotEmpty) {
+          String? countryCode = placemarks.first.isoCountryCode;
+          setState(() {
+            if (countryCode == "ID")
+              _baseCurrency = "IDR";
+            else if (countryCode == "JP")
+              _baseCurrency = "JPY";
+            else if (countryCode == "US")
+              _baseCurrency = "USD";
+            else if (countryCode == "GB")
+              _baseCurrency = "GBP";
+            else if (countryCode == "AU")
+              _baseCurrency = "AUD";
+          });
+        }
       }
     } catch (e) {
       debugPrint("LBS Error: $e");
@@ -56,14 +74,10 @@ class _CurrencyPageState extends State<CurrencyPage> {
 
     try {
       final data = await CurrencyService().getLatestRates(_baseCurrency);
-
       if (mounted) {
         setState(() {
           _rates = data;
           _isLoading = false;
-          // Debugging: Print untuk melihat apakah data masuk ke HP kamu
-          debugPrint("Rates loaded for $_baseCurrency: $_rates");
-          _calculate();
         });
       }
     } catch (e) {
@@ -74,18 +88,31 @@ class _CurrencyPageState extends State<CurrencyPage> {
     }
   }
 
-  void _calculate() {
-    if (_rates.isNotEmpty && _rates.containsKey(_targetCurrency)) {
-      // Hapus titik agar bisa dibaca sebagai angka oleh Dart
-      String cleanValue = _amountController.text.replaceAll('.', '');
-      double amount = double.tryParse(cleanValue) ?? 0;
-
-      double rate = (_rates[_targetCurrency] as num).toDouble();
-
-      setState(() {
-        _result = amount * rate;
-      });
+  // Sekarang dipanggil manual via tombol
+  void _convert() {
+    if (_rates.isEmpty || !_rates.containsKey(_targetCurrency)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Rates belum tersedia, coba lagi.")),
+      );
+      return;
     }
+
+    String cleanValue = _amountController.text.replaceAll('.', '');
+    double amount = double.tryParse(cleanValue) ?? 0;
+
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Masukkan jumlah yang valid.")),
+      );
+      return;
+    }
+
+    double rate = (_rates[_targetCurrency] as num).toDouble();
+
+    setState(() {
+      _result = amount * rate;
+      _hasConverted = true;
+    });
   }
 
   @override
@@ -111,11 +138,10 @@ class _CurrencyPageState extends State<CurrencyPage> {
                       labelText: "Amount",
                       hintText: "Contoh: 1.000",
                     ),
-                    onChanged: (value) => _calculate(),
+                    // Hapus onChanged → tidak auto-calculate lagi
                   ),
                   const SizedBox(height: 20),
 
-                  // Dropdown Row
                   Row(
                     children: [
                       Expanded(child: _buildCurrencyDropdown(true)),
@@ -130,36 +156,64 @@ class _CurrencyPageState extends State<CurrencyPage> {
                     ],
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
 
-                  // Result Card (Sesuai Tema Biru-Ungu)
-                  Container(
+                  // TOMBOL CONVERT
+                  SizedBox(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [colorScheme.primary, colorScheme.secondary],
+                    child: FilledButton.icon(
+                      onPressed: _convert,
+                      icon: const Icon(Icons.currency_exchange),
+                      label: const Text(
+                        "Convert",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          "Result",
-                          style: TextStyle(color: Colors.white70),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "${NumberFormat("#,###", "pt_BR").format(_result).replaceAll(',', '.')} $_targetCurrency",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // Result Card — hanya muncul setelah tombol ditekan
+                  if (_hasConverted)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [colorScheme.primary, colorScheme.secondary],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            "${_amountController.text} $_baseCurrency =",
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "${NumberFormat("#,###", "pt_BR").format(_result).replaceAll(',', '.')} $_targetCurrency",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -167,7 +221,6 @@ class _CurrencyPageState extends State<CurrencyPage> {
   }
 
   Widget _buildCurrencyDropdown(bool isBase) {
-    // Daftar lengkap mata uang yang didukung API Frankfurter
     List<String> items = [
       "AUD",
       "BGN",
@@ -203,8 +256,8 @@ class _CurrencyPageState extends State<CurrencyPage> {
     ];
 
     return DropdownButtonFormField<String>(
-      initialValue: isBase ? _baseCurrency : _targetCurrency,
-      // Gunakan isExpanded agar teks tidak terpotong jika layar kecil
+      // FIX: ganti initialValue → value
+      value: isBase ? _baseCurrency : _targetCurrency,
       isExpanded: true,
       decoration: const InputDecoration(
         contentPadding: EdgeInsets.symmetric(horizontal: 12),
@@ -221,39 +274,34 @@ class _CurrencyPageState extends State<CurrencyPage> {
         setState(() {
           if (isBase) {
             _baseCurrency = val!;
+            _hasConverted = false; // Reset hasil saat base berubah
           } else {
             _targetCurrency = val!;
+            _hasConverted = false; // Reset hasil saat target berubah
           }
         });
-        if (isBase) {
-          _fetchNewRates();
-        } else {
-          _calculate();
-        }
+        if (isBase) _fetchNewRates(); // Fetch ulang hanya jika base berubah
       },
     );
   }
 }
 
+// FIX: Guard against empty/zero input
 class ThousandSeparatorFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    if (newValue.text.isEmpty) {
-      return newValue.copyWith(text: '');
-    }
+    if (newValue.text.isEmpty) return newValue.copyWith(text: '');
 
-    // Hapus semua karakter selain angka
     String cleanedText = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanedText.isEmpty) return newValue.copyWith(text: '');
 
-    // Format angka menggunakan NumberFormat dari package intl
-    final formatter = NumberFormat(
-      "#,###",
-      "pt_BR",
-    ); // pt_BR menggunakan titik (.)
-    double value = double.parse(cleanedText);
+    double? value = double.tryParse(cleanedText);
+    if (value == null) return oldValue;
+
+    final formatter = NumberFormat("#,###", "pt_BR");
     String formattedText = formatter.format(value).replaceAll(',', '.');
 
     return TextEditingValue(

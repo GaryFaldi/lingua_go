@@ -28,7 +28,7 @@ class _QuestDetailPageState extends State<QuestDetailPage> {
   @override
   void initState() {
     super.initState();
-    _spellModel.loadModel(); // load JSON saat page dibuka
+    _spellModel.loadModel();
   }
 
   String? _getSpellSuggestion(String input, String correct) {
