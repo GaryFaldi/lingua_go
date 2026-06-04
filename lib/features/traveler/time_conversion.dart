@@ -20,7 +20,11 @@ class _TimeConversionPageState extends State<TimeConversionPage> {
   // Kita tidak perlu menulis offset manual lagi, cukup ID lokasinya saja
   final List<Map<String, String>> _displayLocations = [
     {'id': 'Asia/Jakarta', 'name': 'Jakarta', 'desc': 'WIB - West Indonesia'},
-    {'id': 'Asia/Makassar', 'name': 'Denpasar', 'desc': 'WITA - Central Indonesia'},
+    {
+      'id': 'Asia/Makassar',
+      'name': 'Denpasar',
+      'desc': 'WITA - Central Indonesia',
+    },
     {'id': 'Asia/Jayapura', 'name': 'Jayapura', 'desc': 'WIT - East Indonesia'},
     {'id': 'Europe/London', 'name': 'London', 'desc': 'United Kingdom'},
     {'id': 'Asia/Tokyo', 'name': 'Tokyo', 'desc': 'Japan'},
@@ -38,22 +42,29 @@ class _TimeConversionPageState extends State<TimeConversionPage> {
 
   // Fungsi LBS: Deteksi lokasi user dan tentukan zona waktunya
   Future<void> _determinePosition() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
+    // Hardcode Yogyakarta untuk testing
+    const double lat = -7.7956;
+    const double lng = 110.3695;
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
-    }
+    String zoneId = _getIndonesiaTimezone(lat, lng);
 
-    Position position = await Geolocator.getCurrentPosition();
-    // Konversi Lat/Lng ke ID zona waktu (misal: "Asia/Jakarta")
-    String zoneId = tzmap.latLngToTimezoneString(position.latitude, position.longitude);
-    
     setState(() {
       _localZoneName = zoneId;
     });
+  }
+
+  String _getIndonesiaTimezone(double lat, double lng) {
+    // Indonesia: longitude 95° - 141°
+    if (lng >= 95 && lng <= 141) {
+      if (lng < 115)
+        return 'Asia/Jakarta'; // WIB: Sumatra, Jawa, Kalbar, Kalteng
+      if (lng < 135)
+        return 'Asia/Makassar'; // WITA: Bali, NTB, NTT, Kaltim, Sulawesi
+      return 'Asia/Jayapura'; // WIT: Maluku, Papua
+    }
+
+    // Kalau di luar Indonesia, fallback ke library
+    return tzmap.latLngToTimezoneString(lat, lng);
   }
 
   @override
@@ -73,9 +84,19 @@ class _TimeConversionPageState extends State<TimeConversionPage> {
         children: [
           _buildMainClock(colorScheme),
           const SizedBox(height: 25),
-          const Text("Zone Explorer", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            "Zone Explorer",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 10),
-          ..._displayLocations.map((loc) => _buildTimeTile(loc['id']!, loc['name']!, loc['desc']!, colorScheme)),
+          ..._displayLocations.map(
+            (loc) => _buildTimeTile(
+              loc['id']!,
+              loc['name']!,
+              loc['desc']!,
+              colorScheme,
+            ),
+          ),
         ],
       ),
     );
@@ -85,22 +106,36 @@ class _TimeConversionPageState extends State<TimeConversionPage> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [colorScheme.primary, colorScheme.secondary]),
+        gradient: LinearGradient(
+          colors: [colorScheme.primary, colorScheme.secondary],
+        ),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         children: [
-          Text("Detected Zone: $_localZoneName", style: const TextStyle(color: Colors.white70)),
+          Text(
+            "Detected Zone: $_localZoneName",
+            style: const TextStyle(color: Colors.white70),
+          ),
           Text(
             DateFormat('HH:mm:ss').format(DateTime.now()),
-            style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 40,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTimeTile(String zoneId, String city, String desc, ColorScheme colorScheme) {
+  Widget _buildTimeTile(
+    String zoneId,
+    String city,
+    String desc,
+    ColorScheme colorScheme,
+  ) {
     // Mengambil waktu spesifik berdasarkan zona waktu ID dari library timezone
     final location = tz.getLocation(zoneId);
     final cityTime = tz.TZDateTime.from(_utcNow, location);
@@ -112,7 +147,11 @@ class _TimeConversionPageState extends State<TimeConversionPage> {
         subtitle: Text(desc),
         trailing: Text(
           DateFormat('HH:mm').format(cityTime),
-          style: TextStyle(fontSize: 20, color: colorScheme.primary, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 20,
+            color: colorScheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
