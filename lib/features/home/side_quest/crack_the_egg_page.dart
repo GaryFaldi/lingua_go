@@ -1,19 +1,14 @@
 // lib/features/home/side_quest/crack_the_egg_page.dart
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:sensors_plus/sensors_plus.dart';
-import '../../../data/local/quest_data.dart';
-import '../../../data/models/quest_model.dart';
+import 'package:get/get.dart';
 import '../main_quest/quest_provider.dart';
-import '../../../data/local/database_helper.dart';
-
-enum EggState { whole, cracked, broken }
+import 'crack_the_egg_controller.dart';
 
 class CrackTheEggPage extends StatefulWidget {
-  final QuestProvider questProvider; // <-- terima dari luar
+  final QuestProvider questProvider;
   final int userId;
+
   const CrackTheEggPage({
     super.key,
     required this.questProvider,
@@ -26,28 +21,9 @@ class CrackTheEggPage extends StatefulWidget {
 
 class _CrackTheEggPageState extends State<CrackTheEggPage>
     with TickerProviderStateMixin {
-  StreamSubscription<AccelerometerEvent>? _sub;
+  late CrackTheEggController controller;
 
-  EggState _eggState = EggState.whole;
-  int _shakeCount = 0;
-  static const int _shakesToCrack = 3;
-  static const int _shakesToBreak = 6;
-
-  int _eggsOpened = 0;
-  static const int _maxEggs = 3;
-  int _totalXp = 0;
-  bool _isLoadingAttempts = true;
-  bool _limitReached = false;
-  bool _sessionDone = false;
-
-  VocabItem? _rewardVocab;
-  int _rewardXp = 0;
-  bool _showingReward = false;
-
-  double _lastX = 0, _lastY = 0, _lastZ = 0;
-  static const double _shakeThreshold = 12.0;
-  DateTime _lastShake = DateTime.now();
-
+  // Animasi tetap di View karena terikat TickerProvider (VSYNC) layar perangkat
   late AnimationController _wobbleCtrl;
   late Animation<double> _wobbleAnim;
   late AnimationController _crackCtrl;
@@ -56,12 +32,19 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
   late AnimationController _rewardCtrl;
   late Animation<double> _rewardAnim;
 
-  final _rand = Random();
-
   @override
   void initState() {
     super.initState();
 
+    // Inisialisasi GetX Controller
+    controller = Get.put(
+      CrackTheEggController(
+        questProvider: widget.questProvider,
+        userId: widget.userId,
+      ),
+    );
+
+    // Integrasi Animasi dengan trigger dari Controller
     _wobbleCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -90,124 +73,20 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
       parent: _rewardCtrl,
       curve: Curves.elasticOut,
     );
-    _checkDailyLimit();
-    _startListening();
-  }
 
-  Future<void> _checkDailyLimit() async {
-    final db = DatabaseHelper.instance;
-    final count = await db.getDailyAttempts(widget.userId, 'crack_the_egg');
-    debugPrint('_checkDailyLimit: userId=${widget.userId}, count=$count');
-    if (!mounted) return;
-    setState(() {
-      _eggsOpened = count;
-      _limitReached = count >= _maxEggs;
-      _isLoadingAttempts = false;
-    });
-    if (!_limitReached) _startListening();
-  }
-
-  void _startListening() {
-    _sub = accelerometerEventStream().listen((event) {
-      if (_showingReward || _sessionDone) return;
-      if (_eggState == EggState.broken) return;
-
-      final now = DateTime.now();
-      if (now.difference(_lastShake).inMilliseconds < 400) return;
-
-      final dx = (event.x - _lastX).abs();
-      final dy = (event.y - _lastY).abs();
-      final dz = (event.z - _lastZ).abs();
-
-      if ((dx + dy + dz) > _shakeThreshold) {
-        _lastShake = now;
-        _onShake();
-      }
-
-      _lastX = event.x;
-      _lastY = event.y;
-      _lastZ = event.z;
-    });
-  }
-
-  void _onShake() {
-    HapticFeedback.mediumImpact();
-    _wobbleCtrl.forward(from: 0);
-    setState(() => _shakeCount++);
-
-    if (_shakeCount >= _shakesToBreak) {
-      _breakEgg();
-    } else if (_shakeCount >= _shakesToCrack) {
-      setState(() => _eggState = EggState.cracked);
-      _crackCtrl.forward(from: 0);
-    }
-  }
-
-  void _breakEgg() {
-    setState(() => _eggState = EggState.broken);
-    _burstCtrl.forward(from: 0);
-
-    final allVocabs = QuestData.levels.expand((l) => l.vocabs).toList();
-    allVocabs.shuffle();
-    _rewardVocab = allVocabs.first;
-    _rewardXp = 10 + _rand.nextInt(41);
-
-    Future.delayed(const Duration(milliseconds: 700), () {
-      if (!mounted) return;
-      setState(() => _showingReward = true);
-      _rewardCtrl.forward(from: 0);
-    });
-  }
-
-  Future<void> _collectReward() async {
-    if (!mounted) return;
-
-    final newEggsOpened = _eggsOpened + 1;
-    final isDone = newEggsOpened >= _maxEggs;
-    final xpToAdd = _rewardXp;
-
-    setState(() {
-      _showingReward = false;
-      _totalXp += xpToAdd;
-      _eggsOpened = newEggsOpened;
-      if (!isDone) {
-        _eggState = EggState.whole;
-        _shakeCount = 0;
-        _rewardVocab = null;
-        _rewardXp = 0;
-      }
-    });
-
-    _burstCtrl.reset();
-    _rewardCtrl.reset();
-    _wobbleCtrl.reset();
-
-    try {
-      debugPrint('incrementDailyAttempt: userId=${widget.userId}');
-      await DatabaseHelper.instance.incrementDailyAttempt(
-        widget.userId,
-        'crack_the_egg',
-      );
-      debugPrint('addXp: xp=$xpToAdd');
-      await widget.questProvider.addXp(xpToAdd);
-      debugPrint('addXp done, currentXp=${widget.questProvider.currentXp}');
-    } catch (e) {
-      debugPrint('_collectReward error: $e');
-    }
-
-    if (isDone) {
-      if (!mounted) return;
-      setState(() => _sessionDone = true);
-    }
+    // Sambungkan fungsi animasi ke controller
+    controller.onWobbleTrigger = () => _wobbleCtrl.forward(from: 0);
+    controller.onBurstTrigger = () => _burstCtrl.forward(from: 0);
+    controller.onRewardTrigger = () => _rewardCtrl.forward(from: 0);
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
     _wobbleCtrl.dispose();
     _crackCtrl.dispose();
     _burstCtrl.dispose();
     _rewardCtrl.dispose();
+    Get.delete<CrackTheEggController>(); // Bersihkan controller dari memori
     super.dispose();
   }
 
@@ -226,22 +105,31 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
-              child: Text(
-                '$_eggsOpened/$_maxEggs 🥚',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              child: Obx(
+                () => Text(
+                  '${controller.eggsOpened.value}/${CrackTheEggController.maxEggs} 🥚',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
           ),
         ],
       ),
-      body: _limitReached
-          ? _buildLimitReached()
-          : _sessionDone
-          ? _buildSessionDone()
-          : _buildGame(),
+      body: Obx(() {
+        if (controller.isLoadingAttempts.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (controller.limitReached.value) {
+          return _buildLimitReached();
+        }
+        if (controller.sessionDone.value) {
+          return _buildSessionDone();
+        }
+        return _buildGame();
+      }),
     );
   }
 
@@ -288,48 +176,67 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
           children: [
             _buildXpBar(),
             const SizedBox(height: 20),
-            Text(
-              _eggState == EggState.whole
-                  ? 'Guncang HP untuk memecahkan telur!'
-                  : _eggState == EggState.cracked
-                  ? 'Terus guncang... hampir pecah!'
-                  : 'Telur pecah!',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.brown.shade600,
-                fontWeight: FontWeight.w500,
+            Obx(
+              () => Text(
+                controller.eggState.value == EggState.whole
+                    ? 'Guncang HP untuk memecahkan telur!'
+                    : controller.eggState.value == EggState.cracked
+                    ? 'Terus guncang... hampir pecah!'
+                    : 'Telur pecah!',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.brown.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
             const SizedBox(height: 8),
-            if (!_showingReward) _buildShakeProgress(),
+            Obx(
+              () => !controller.showingReward.value
+                  ? _buildShakeProgress()
+                  : const SizedBox.shrink(),
+            ),
             const SizedBox(height: 30),
             Expanded(
               child: Center(
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    if (_eggState == EggState.broken) _buildBurst(),
+                    Obx(
+                      () => controller.eggState.value == EggState.broken
+                          ? _buildBurst()
+                          : const SizedBox.shrink(),
+                    ),
                     _buildEgg(),
                   ],
                 ),
               ),
             ),
-            if (!_showingReward)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 30),
-                child: OutlinedButton.icon(
-                  onPressed: _eggState != EggState.broken ? _onShake : null,
-                  icon: const Icon(Icons.touch_app),
-                  label: const Text('Tap jika sensor tidak berfungsi'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.brown.shade500,
-                    side: BorderSide(color: Colors.brown.shade300),
-                  ),
-                ),
-              ),
+            Obx(
+              () => !controller.showingReward.value
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 30),
+                      child: OutlinedButton.icon(
+                        onPressed: controller.eggState.value != EggState.broken
+                            ? controller.onShake
+                            : null,
+                        icon: const Icon(Icons.touch_app),
+                        label: const Text('Tap jika sensor tidak berfungsi'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.brown.shade500,
+                          side: BorderSide(color: Colors.brown.shade300),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
           ],
         ),
-        if (_showingReward) _buildRewardOverlay(),
+        Obx(
+          () => controller.showingReward.value
+              ? _buildRewardOverlay()
+              : const SizedBox.shrink(),
+        ),
       ],
     );
   }
@@ -350,18 +257,22 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
             children: [
               const Text('⭐', style: TextStyle(fontSize: 18)),
               const SizedBox(width: 6),
-              Text(
-                'XP terkumpul: $_totalXp',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.amber.shade800,
+              Obx(
+                () => Text(
+                  'XP terkumpul: ${controller.totalXp.value}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber.shade800,
+                  ),
                 ),
               ),
             ],
           ),
-          Text(
-            'Telur ${_eggsOpened + 1} dari $_maxEggs',
-            style: TextStyle(color: Colors.amber.shade700, fontSize: 13),
+          Obx(
+            () => Text(
+              'Telur ${controller.eggsOpened.value + 1} dari ${CrackTheEggController.maxEggs}',
+              style: TextStyle(color: Colors.amber.shade700, fontSize: 13),
+            ),
           ),
         ],
       ),
@@ -369,34 +280,37 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
   }
 
   Widget _buildShakeProgress() {
-    final progress = _shakeCount / _shakesToBreak;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Column(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress.clamp(0.0, 1.0),
-              minHeight: 10,
-              backgroundColor: Colors.brown.shade100,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                progress < 0.5
-                    ? Colors.amber.shade400
-                    : progress < 0.85
-                    ? Colors.orange.shade400
-                    : Colors.red.shade400,
+    return Obx(() {
+      final progress =
+          controller.shakeCount.value / CrackTheEggController.shakesToBreak;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: progress.clamp(0.0, 1.0),
+                minHeight: 10,
+                backgroundColor: Colors.brown.shade100,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  progress < 0.5
+                      ? Colors.amber.shade400
+                      : progress < 0.85
+                      ? Colors.orange.shade400
+                      : Colors.red.shade400,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$_shakeCount/$_shakesToBreak guncangan',
-            style: TextStyle(fontSize: 12, color: Colors.brown.shade400),
-          ),
-        ],
-      ),
-    );
+            const SizedBox(height: 4),
+            Text(
+              '${controller.shakeCount.value}/${CrackTheEggController.shakesToBreak} guncangan',
+              style: TextStyle(fontSize: 12, color: Colors.brown.shade400),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _buildEgg() {
@@ -404,10 +318,10 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
       animation: Listenable.merge([_wobbleCtrl, _burstCtrl]),
       builder: (_, child) {
         final wobble = sin(_wobbleAnim.value * pi * 4) * 12;
-        final burstScale = _eggState == EggState.broken
+        final burstScale = controller.eggState.value == EggState.broken
             ? (1.0 + _burstAnim.value * 0.4)
             : 1.0;
-        final opacity = _eggState == EggState.broken
+        final opacity = controller.eggState.value == EggState.broken
             ? (1.0 - _burstAnim.value).clamp(0.0, 1.0)
             : 1.0;
 
@@ -419,7 +333,7 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
           ),
         );
       },
-      child: _EggWidget(state: _eggState),
+      child: Obx(() => _EggWidget(state: controller.eggState.value)),
     );
   }
 
@@ -467,12 +381,14 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
                     borderRadius: BorderRadius.circular(50),
                     border: Border.all(color: Colors.amber.shade200),
                   ),
-                  child: Text(
-                    '+$_rewardXp XP',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.amber.shade700,
+                  child: Obx(
+                    () => Text(
+                      '+${controller.rewardXp.value} XP',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade700,
+                      ),
                     ),
                   ),
                 ),
@@ -494,16 +410,21 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
                   child: Column(
                     children: [
                       Text(
-                        _rewardVocab?.word ?? '',
+                        controller.rewardVocab.value?.word ?? '',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (_rewardVocab?.pronunciation.isNotEmpty ?? false)
+                      if (controller
+                              .rewardVocab
+                              .value
+                              ?.pronunciation
+                              .isNotEmpty ??
+                          false)
                         Text(
-                          '[${_rewardVocab!.pronunciation}]',
+                          '[${controller.rewardVocab.value!.pronunciation}]',
                           style: const TextStyle(
                             color: Colors.white60,
                             fontSize: 13,
@@ -511,7 +432,7 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
                         ),
                       const SizedBox(height: 6),
                       Text(
-                        _rewardVocab?.meaning ?? '',
+                        controller.rewardVocab.value?.meaning ?? '',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -521,9 +442,9 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
                   ),
                 ),
                 const SizedBox(height: 8),
-                if (_rewardVocab?.example.isNotEmpty ?? false)
+                if (controller.rewardVocab.value?.example.isNotEmpty ?? false)
                   Text(
-                    '"${_rewardVocab!.example}"',
+                    '"${controller.rewardVocab.value!.example}"',
                     style: TextStyle(
                       fontStyle: FontStyle.italic,
                       color: Colors.grey.shade600,
@@ -535,7 +456,12 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _collectReward,
+                    onPressed: () {
+                      _burstCtrl.reset();
+                      _rewardCtrl.reset();
+                      _wobbleCtrl.reset();
+                      controller.collectReward();
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.amber.shade400,
                       foregroundColor: Colors.white,
@@ -544,13 +470,16 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    child: Text(
-                      _eggsOpened + 1 < _maxEggs
-                          ? 'Ambil & Lanjut! 🥚'
-                          : 'Ambil & Selesai! 🎉',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                    child: Obx(
+                      () => Text(
+                        controller.eggsOpened.value + 1 <
+                                CrackTheEggController.maxEggs
+                            ? 'Ambil & Lanjut! 🥚'
+                            : 'Ambil & Selesai! 🎉',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -589,12 +518,14 @@ class _CrackTheEggPageState extends State<CrackTheEggPage>
                 borderRadius: BorderRadius.circular(50),
                 border: Border.all(color: Colors.amber.shade300),
               ),
-              child: Text(
-                '+$_totalXp XP',
-                style: TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.amber.shade700,
+              child: Obx(
+                () => Text(
+                  '+${controller.totalXp.value} XP',
+                  style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber.shade700,
+                  ),
                 ),
               ),
             ),
